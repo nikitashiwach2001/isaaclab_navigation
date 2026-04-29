@@ -154,7 +154,7 @@ def navigation_reward_A(env: ManagerBasedRLEnv) -> torch.Tensor:
 
 
 def navigation_reward_B(env: ManagerBasedRLEnv) -> torch.Tensor:
-    """Gazebo-style reward B + mild anti-deadlock + moving-obstacle CP reward."""
+    """Gazebo get_reward_B converted to Isaac Lab vectorized reward."""
 
     goal_dist, goal_angle = _get_goal_distance_and_angle(env)
     min_obstacle_dist = _get_lidar_min_distance(env)
@@ -165,140 +165,74 @@ def navigation_reward_B(env: ManagerBasedRLEnv) -> torch.Tensor:
     success = goal_dist < THRESHOLD_GOAL
     collision = min_obstacle_dist < THRESHOLD_COLLISION
 
-    # -----------------------------
-    # Basic Gazebo-style terms
-    # -----------------------------
     near_obstacle = min_obstacle_dist < 0.65
 
-    # r_yaw = -torch.abs(goal_angle)
-    # r_yaw = torch.where(success, torch.zeros_like(r_yaw), r_yaw)
-
-    r_yaw = torch.where(
-    near_obstacle,
-    -0.3 * torch.abs(goal_angle),    # 70% reduced near obstacle
-    -1.0 * torch.abs(goal_angle),    # full penalty in open space
-    )
+    # [-3.14, 0]
+    r_yaw = -torch.abs(goal_angle)
     r_yaw = torch.where(success, torch.zeros_like(r_yaw), r_yaw)
 
-    # Reduced angular penalty to allow committed detours
-    # r_vangular = -1.0 * (action_angular ** 2)
-    # 3. r_vangular — allow sharp turns freely near obstacle
-    r_vangular = torch.where(
-        near_obstacle,
-        -0.1 * (action_angular ** 2),    # near obstacle: turn freely
-        -0.5 * (action_angular ** 2),    # open space: discourage spinning
-    )
+    # Same as Gazebo: [-4, 0] when angular max is 2.0
+    r_vangular = -1.0 * (action_angular**2)
+    # near_obstacle = min_obstacle_dist < 0.55
 
-    progress = env.goal_dist_prev - goal_dist
-    r_distance = progress * 30.0
+    # r_vangular = torch.where(
+    #     near_obstacle,
+    #     -0.2 * (action_angular**2),   # allow sharp turns near obstacle
+    #     -1.0 * (action_angular**2),   # still discourage spinning in open space
+    # )
+
+    # Delta-based distance reward
+    r_distance = (env.goal_dist_prev - goal_dist) * 30.0
     env.goal_dist_prev[:] = goal_dist
 
+    # no progress penealty
+    no_progress = r_distance < 0.005
     not_near_goal = goal_dist > 0.40
-    low_linear = action_linear < 0.08
-    no_progress = progress < 0.0003
 
-    # Mild stuck penalty
     r_stuck = torch.where(
         no_progress & not_near_goal,
-        torch.full_like(goal_dist, -0.35),
+        torch.full_like(goal_dist, -0.25),
         torch.zeros_like(goal_dist),
     )
 
-    # Reduced freeze penalty, not too harsh
+    
+    low_linear = action_linear < 0.08
+    not_near_goal = goal_dist > 0.40
+    no_progress = r_distance < 0.005
+
     r_freeze = torch.where(
         near_obstacle & low_linear & not_near_goal & no_progress,
-        torch.full_like(goal_dist, -0.5),
-        torch.zeros_like(goal_dist),
-    )
-
-    # Penalize rotate-in-place behavior
-    spin_penalty = torch.where(
-        (torch.abs(action_angular) > 0.7) & (action_linear < 0.08) & not_near_goal,
         torch.full_like(goal_dist, -1.0),
         torch.zeros_like(goal_dist),
     )
 
-    # # Mild deadlock penalty
-    deadlock_penalty = torch.where(
-        no_progress & not_near_goal,
-        torch.full_like(goal_dist, -1.5),
-        torch.zeros_like(goal_dist),
-    )
-
-    # Gazebo-style obstacle danger penalty only near collision
+    # Same as Gazebo: obstacle penalty when below 0.22m
     r_obstacle = torch.where(
         min_obstacle_dist < 0.22,
         torch.full_like(min_obstacle_dist, -20.0),
         torch.zeros_like(min_obstacle_dist),
     )
 
-    # Prefer forward movement
+    # gradual penelty
+    # safe_dist = 0.50
+    # danger_dist = 0.25
+
+    # r_obstacle = -4.0 * torch.clamp(
+    #     (safe_dist - min_obstacle_dist) / safe_dist,
+    #     0.0,
+    #     1.0,
+    # ) ** 2
+
+    # r_obstacle = torch.where(
+    #     min_obstacle_dist < danger_dist,
+    #     r_obstacle - 15.0,
+    #     r_obstacle,
+    # )
+
+    # Same as Gazebo: prefer max forward speed 0.22
     r_vlinear = -(((MAX_LINEAR_SPEED - action_linear) * 10.0) ** 2)
 
-    # -----------------------------
-    # Moving obstacle CP reward
-    # -----------------------------
-    r_cp = torch.zeros_like(goal_dist)
-
-    if "obstacle_3" in env.scene.keys():
-        robot = env.scene["robot"]
-        obstacle = env.scene["obstacle_3"]
-
-        robot_pos_xy = robot.data.root_pos_w[:, :2]
-        obstacle_pos_xy = obstacle.data.root_pos_w[:, :2]
-
-        # Use root linear velocity if available
-        robot_vel_xy = robot.data.root_lin_vel_w[:, :2]
-        obstacle_vel_xy = obstacle.data.root_lin_vel_w[:, :2]
-
-        rel_pos = obstacle_pos_xy - robot_pos_xy
-        dist = torch.norm(rel_pos, dim=-1)
-
-        rel_vel = obstacle_vel_xy - robot_vel_xy
-        obstacle_speed = torch.norm(obstacle_vel_xy, dim=-1)
-
-        # Positive closing speed means obstacle/robot are getting closer
-        closing_speed = -torch.sum(rel_pos * rel_vel, dim=-1) / torch.clamp(dist, min=1e-6)
-
-        approaching = closing_speed > 0.0
-        moving_obstacle = obstacle_speed > 0.02
-
-        ttc = dist / torch.clamp(closing_speed, min=1e-6)
-
-        pc_ttc = torch.where(
-            approaching,
-            torch.clamp(0.15 / torch.clamp(ttc, min=1e-6), 0.0, 1.0),
-            torch.zeros_like(dist),
-        )
-
-        pc_dist = torch.clamp(
-            (0.80 - dist) / (0.80 - THRESHOLD_COLLISION),
-            0.0,
-            1.0,
-        )
-
-        cp = 0.5 * pc_ttc + 0.5 * pc_dist
-
-        # CP only affects true moving obstacle
-        r_cp = torch.where(
-            moving_obstacle,
-            -1.5 * cp,
-            torch.zeros_like(cp),
-        )
-
-    reward = (
-        r_yaw
-        + r_distance
-        + r_obstacle
-        + r_vlinear
-        + r_vangular
-        + r_stuck
-        + r_freeze
-        + spin_penalty
-        + deadlock_penalty
-        + r_cp
-        - 1.0
-    )
+    reward = r_yaw + r_distance + r_obstacle + r_vlinear + r_vangular + r_stuck + r_freeze - 1.0
 
     reward = torch.where(success, reward + SUCCESS_REWARD, reward)
     reward = torch.where(collision, reward - COLLISION_PENALTY, reward)
@@ -324,3 +258,110 @@ class RewardsCfg:
         func=navigation_reward,
         weight=1.0,
     )
+
+
+##################################################
+# with this reward function the agent learns the partial behviour to navigate around the movinf obstacle but stuck near the static obstacle
+# after this I added a cp reward 
+# def navigation_reward_B(env: ManagerBasedRLEnv) -> torch.Tensor:
+    # """Gazebo get_reward_B converted to Isaac Lab vectorized reward."""
+
+    # goal_dist, goal_angle = _get_goal_distance_and_angle(env)
+    # min_obstacle_dist = _get_lidar_min_distance(env)
+    # action_linear, action_angular = _get_real_actions(env)
+
+    # _ensure_reward_buffers(env, goal_dist)
+
+    # success = goal_dist < THRESHOLD_GOAL
+    # collision = min_obstacle_dist < THRESHOLD_COLLISION
+
+    # near_obstacle = min_obstacle_dist < 0.65
+
+    # # [-3.14, 0]
+    # r_yaw = -torch.abs(goal_angle)
+    # r_yaw = torch.where(success, torch.zeros_like(r_yaw), r_yaw)
+
+    # # Same as Gazebo: [-4, 0] when angular max is 2.0
+
+    # r_vangular = -0.5 * (action_angular**2) # was -1.0
+    # # near_obstacle = min_obstacle_dist < 0.55
+
+    # # r_vangular = torch.where(
+    # #     near_obstacle,
+    # #     -0.2 * (action_angular**2),   # allow sharp turns near obstacle
+    # #     -1.0 * (action_angular**2),   # still discourage spinning in open space
+    # # )
+
+    # progress = env.goal_dist_prev - goal_dist
+
+    # # 2. Add spin_penalty after r_freeze block
+    # spin_penalty = torch.where(
+    #     (torch.abs(action_angular) > 0.7) & (action_linear < 0.08) & (goal_dist > 0.40),
+    #     torch.full_like(goal_dist, -1.0),
+    #     torch.zeros_like(goal_dist),
+    # )
+
+    # deadlock_penalty = torch.where(
+    #     (torch.abs(progress) < 0.0003) & (goal_dist > 0.40), # was 0.0005
+    #     torch.full_like(goal_dist, -0.35),
+    #     torch.zeros_like(goal_dist),
+    # )
+
+
+    # # Delta-based distance reward
+    # r_distance = progress * 30.0
+    # env.goal_dist_prev[:] = goal_dist
+
+    # # no progress penealty
+    # no_progress = r_distance < 0.005
+    # not_near_goal = goal_dist > 0.40
+
+    # r_stuck = torch.where(
+    #     no_progress & not_near_goal,
+    #     torch.full_like(goal_dist, -0.5), # was -0.25
+    #     torch.zeros_like(goal_dist),
+    # )
+
+    
+    # low_linear = action_linear < 0.08
+    # not_near_goal = goal_dist > 0.40
+    # no_progress = r_distance < 0.005
+
+    # r_freeze = torch.where(
+    #     near_obstacle & low_linear & not_near_goal & no_progress,
+    #     torch.full_like(goal_dist, -1.0),
+    #     torch.zeros_like(goal_dist),
+    # )
+
+    # # Same as Gazebo: obstacle penalty when below 0.22m
+    # r_obstacle = torch.where(
+    #     min_obstacle_dist < 0.22,
+    #     torch.full_like(min_obstacle_dist, -20.0),
+    #     torch.zeros_like(min_obstacle_dist),
+    # )
+
+    # # gradual penelty
+    # # safe_dist = 0.50
+    # # danger_dist = 0.25
+
+    # # r_obstacle = -4.0 * torch.clamp(
+    # #     (safe_dist - min_obstacle_dist) / safe_dist,
+    # #     0.0,
+    # #     1.0,
+    # # ) ** 2
+
+    # # r_obstacle = torch.where(
+    # #     min_obstacle_dist < danger_dist,
+    # #     r_obstacle - 15.0,
+    # #     r_obstacle,
+    # # )
+
+    # # Same as Gazebo: prefer max forward speed 0.22
+    # r_vlinear = -(((MAX_LINEAR_SPEED - action_linear) * 10.0) ** 2)
+
+    # reward = deadlock_penalty + r_yaw + r_distance + r_obstacle + r_vlinear + r_vangular + r_stuck + r_freeze + spin_penalty - 1.0
+
+    # reward = torch.where(success, reward + SUCCESS_REWARD, reward)
+    # reward = torch.where(collision, reward - COLLISION_PENALTY, reward)
+
+    # return reward

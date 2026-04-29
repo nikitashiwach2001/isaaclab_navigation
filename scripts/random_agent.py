@@ -35,33 +35,77 @@ import torch
 import isaaclab_tasks  # noqa: F401
 from isaaclab_tasks.utils import parse_env_cfg
 
+
 import isaaclab_scene.tasks  # noqa: F401
 
 
 def main():
-    """Random actions agent with Isaac Lab environment."""
-    # create environment configuration
+    """Goal-following sanity test agent."""
+
     env_cfg = parse_env_cfg(
-        args_cli.task, device=args_cli.device, num_envs=args_cli.num_envs, use_fabric=not args_cli.disable_fabric
+        args_cli.task,
+        device=args_cli.device,
+        num_envs=args_cli.num_envs,
+        use_fabric=not args_cli.disable_fabric,
     )
-    # create environment
+
     env = gym.make(args_cli.task, cfg=env_cfg)
 
-    # print info (this is vectorized environment)
+    import numpy as np
+    from gymnasium import spaces
+
+    env.action_space = spaces.Box(
+        low=-1.0,
+        high=1.0,
+        shape=env.action_space.shape,
+        dtype=np.float32,
+    )
+
     print(f"[INFO]: Gym observation space: {env.observation_space}")
     print(f"[INFO]: Gym action space: {env.action_space}")
-    # reset environment
-    env.reset()
-    # simulate environment
-    while simulation_app.is_running():
-        # run everything in inference mode
-        with torch.inference_mode():
-            # sample actions from -1 to 1
-            actions = 2 * torch.rand(env.action_space.shape, device=env.unwrapped.device) - 1
-            # apply actions
-            env.step(actions)
 
-    # close the simulator
+    obs, _ = env.reset()
+
+    print("POLICY OBS SHAPE:", obs["policy"].shape)
+    print("GOAL POS W:", env.unwrapped.goal_pos_w)
+
+    step_count = 0
+
+    while simulation_app.is_running():
+        with torch.inference_mode():
+            goal_dist = obs["policy"][:, 40]
+            goal_angle = obs["policy"][:, 41]
+
+            # Simple manual controller:
+            # if goal is mostly ahead, move forward
+            # otherwise rotate toward the goal
+            linear = torch.where(
+                torch.abs(goal_angle) < 0.25,
+                torch.ones_like(goal_angle),
+                torch.zeros_like(goal_angle),
+            )
+
+            angular = torch.clamp(goal_angle * 2.0, -1.0, 1.0)
+
+            actions = torch.stack([linear, angular], dim=-1)
+
+            obs, reward, terminated, truncated, info = env.step(actions)
+
+            step_count += 1
+
+            if step_count % 20 == 0:
+                goal_dist_obs = obs["policy"][:, 40]
+                goal_angle_obs = obs["policy"][:, 41]
+                goal_dist_real = goal_dist_obs * 7.07106781187
+
+                print("\n--- STEP", step_count, "---")
+                print("GOAL DIST REAL:", goal_dist_real)
+                print("GOAL ANGLE OBS:", goal_angle_obs)
+                print("ACTION:", actions)
+                print("REWARD:", reward)
+                print("TERMINATED:", terminated)
+                print("TRUNCATED:", truncated)
+
     env.close()
 
 

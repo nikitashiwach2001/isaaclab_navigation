@@ -45,24 +45,42 @@ def main():
         args_cli.task, device=args_cli.device, num_envs=args_cli.num_envs, use_fabric=not args_cli.disable_fabric
     )
     # create environment
+    print("CREATING ENVIRONMENT")
     env = gym.make(args_cli.task, cfg=env_cfg)
+    print("AFTER ENV CREATE")
 
     # print info (this is vectorized environment)
     print(f"[INFO]: Gym observation space: {env.observation_space}")
     print(f"[INFO]: Gym action space: {env.action_space}")
     # reset environment
+    print("BEFORE RESET")   
     env.reset()
-    # simulate environment
-    while simulation_app.is_running():
-        # run everything in inference mode
+    print("AFTER RESET")   
+    # FIX WHEEL AXIS
+    from pxr import UsdPhysics
+    import omni.usd
+
+    stage = omni.usd.get_context().get_stage()
+
+    for prim in stage.Traverse():
+        path = str(prim.GetPath())
+        if "wheel_left_joint" in path or "wheel_right_joint" in path:
+            joint = UsdPhysics.RevoluteJoint(prim)
+            joint.GetAxisAttr().Set("Y")
+            print("[FIXED AXIS]:", path)
+
+    step_count = 0
+
+    for _ in range(1000):
         with torch.inference_mode():
-            # compute zero actions
-            actions = torch.zeros(env.action_space.shape, device=env.unwrapped.device)
-            # apply actions
+            print("LOOP RUNNING", step_count)
+
+            actions = torch.tensor([[5.0, 5.0]], device=env.unwrapped.device).repeat(env.num_envs, 1)
             env.step(actions)
 
-    # close the simulator
-    env.close()
+            step_count += 1
+        # close the simulator
+        env.close()
 
 
 if __name__ == "__main__":
