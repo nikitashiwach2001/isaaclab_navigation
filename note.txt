@@ -79,3 +79,39 @@ python scripts/play_td3.py \
   --checkpoint logs/td3_stage2_stuck_penalty_v1/20260428_072837/td3_final.pt \
   --eval_episodes 200 \
   --headless
+
+
+
+  four moving pillers
+
+
+========== EVALUATION SUMMARY ==========
+Checkpoint: logs/apr_30/td3_stage3_steeper_proximity_v1/20260430_061009/td3_final.pt
+Total episodes: 100
+SUCCESS:    75       (75.00%)
+COLL_WALL:  25       (25.00%)
+TIMEOUT:    0        (0.00%)
+TUMBLE:     0        (0.00%)
+TERMINATED: 0        (0.00%)
+========================================
+
+[390.981s] Simulation App Shutting Down
+
+
+best checkpoint on moving obstacle
+
+========== EVALUATION SUMMARY ==========
+Checkpoint: logs/apr_30/td3_stage3_steeper_proximity_v1/20260430_061009/td3_final.pt
+Total episodes: 1000
+SUCCESS:    813      (81.30%)
+COLL_WALL:  187      (18.70%)
+TIMEOUT:    0        (0.00%)
+TUMBLE:     0        (0.00%)
+TERMINATED: 0        (0.00%)
+========================================
+
+python scripts/play_td3.py \
+  --task IsaaclabScene-Stage3-v0 \
+  --checkpoint logs/apr_30/td3_stage3_steeper_proximity_v1/20260430_061009/td3_final.pt \
+  --num_envs 4 \
+

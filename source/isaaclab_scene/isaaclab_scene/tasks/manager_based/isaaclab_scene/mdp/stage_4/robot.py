@@ -28,7 +28,7 @@ TURTLEBOT3_BURGER_CFG = ArticulationCfg(
     },
 )
 
-LIDAR_CFG = MultiMeshRayCasterCfg(
+LIDAR_CFG_4 = MultiMeshRayCasterCfg(
     prim_path="{ENV_REGEX_NS}/Robot/base_link",
     offset=MultiMeshRayCasterCfg.OffsetCfg(pos=(0.0, 0.0, 0.2)),
     # attach_yaw_only=True,
@@ -42,16 +42,17 @@ LIDAR_CFG = MultiMeshRayCasterCfg(
     max_distance=3.5,
     debug_vis=False,
     mesh_prim_paths=[
-        # MultiMeshRayCasterCfg.RaycastTargetCfg(
-        #     prim_expr="{ENV_REGEX_NS}/(?!Robot$).*",
-        #     is_shared=False,
-        #     merge_prim_meshes=True,
-        #     track_mesh_transforms=False,
-        # ),
 
         # static walls
         MultiMeshRayCasterCfg.RaycastTargetCfg(
             prim_expr="{ENV_REGEX_NS}/wall.*",
+            is_shared=True,
+            merge_prim_meshes=True,
+            track_mesh_transforms=False
+        ),
+
+        MultiMeshRayCasterCfg.RaycastTargetCfg(
+            prim_expr="{ENV_REGEX_NS}/InnerWall_.*",
             is_shared=True,
             merge_prim_meshes=True,
             track_mesh_transforms=False

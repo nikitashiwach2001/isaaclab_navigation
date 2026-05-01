@@ -41,7 +41,6 @@ parser.add_argument("--save_interval", type=int, default=25_000)
 parser.add_argument("--run_name", type=str, default="td3_turtlebot_nav")
 parser.add_argument("--load_checkpoint", type=str, default=None, help="Path to TD3 checkpoint to load for finetuning.")
 
-# Isaac Lab launcher args
 AppLauncher.add_app_launcher_args(parser)
 args_cli = parser.parse_args()
 
@@ -71,6 +70,15 @@ from td3.td3_agent import TD3Agent
 from td3.noise import OUNoise
 
 
+# -------------------------
+# Terminal reward constants
+# -------------------------
+SUCCESS_REWARD    =  2500.0
+COLLISION_PENALTY =  2000.0
+TUMBLE_PENALTY    =  2000.0
+TIMEOUT_PENALTY   =  1000.0   # set to e.g. 500.0 for stage 4
+
+
 def get_env_buffer(env, name: str, num_envs: int, device) -> torch.Tensor:
     """Safely get a bool buffer from env.unwrapped."""
     return getattr(
@@ -80,12 +88,74 @@ def get_env_buffer(env, name: str, num_envs: int, device) -> torch.Tensor:
     )
 
 
+def pct(count: int, total: int) -> float:
+    return 100.0 * count / max(total, 1)
+
+
+def print_checkpoint_summary(
+    *,
+    global_step,
+    ckpt_path,
+    window_start_episode,
+    episode_count,
+    window_counts,
+    window_reward_sum,
+    window_step_sum,
+    window_env_steps,
+    window_action_linear_sum,
+    window_action_angular_abs_sum,
+    window_reward_step_sum,
+    window_done_sum,
+    last_losses,
+    replay_buffer,
+    window_start_time,
+):
+    window_total = sum(window_counts.values())
+    elapsed = max(time.time() - window_start_time, 1e-6)
+    fps = window_env_steps / elapsed
+
+    print(f"\n========== CHECKPOINT SUMMARY | step {global_step} ==========")
+    print(f"Checkpoint: {ckpt_path}")
+    print(f"Replay buffer: {len(replay_buffer)}")
+    print(f"Window env steps: {window_env_steps}")
+    print(f"Training FPS: {fps:.1f}")
+
+    if window_env_steps > 0:
+        print(f"Mean reward / env-step: {window_reward_step_sum / window_env_steps:.4f}")
+        print(f"Mean done / env-step: {window_done_sum / window_env_steps:.4f}")
+        print(f"Mean action linear: {window_action_linear_sum / window_env_steps:.4f}")
+        print(f"Mean |action angular|: {window_action_angular_abs_sum / window_env_steps:.4f}")
+
+    print(f"Critic loss: {last_losses.get('critic_loss', 0.0):.6f}")
+    print(f"Actor loss:  {last_losses.get('actor_loss', 0.0):.6f}")
+
+    if window_total > 0:
+        avg_reward = window_reward_sum / window_total
+        avg_steps = window_step_sum / window_total
+
+        print("-" * 58)
+        print(f"Episodes in window: {window_total}  ({window_start_episode + 1} - {episode_count})")
+        print(f"Avg episode reward: {avg_reward:.2f}")
+        print(f"Avg episode steps:  {avg_steps:.1f}")
+
+        print(f"SUCCESS:       {window_counts['success']:<8} ({pct(window_counts['success'], window_total):.2f}%)")
+        print(f"COLL_DYNAMIC:  {window_counts['coll_dynamic']:<8} ({pct(window_counts['coll_dynamic'], window_total):.2f}%)")
+        print(f"COLL_STATIC:   {window_counts['coll_static']:<8} ({pct(window_counts['coll_static'], window_total):.2f}%)")
+        print(f"COLL_BOUNDARY: {window_counts['coll_boundary']:<8} ({pct(window_counts['coll_boundary'], window_total):.2f}%)")
+        print(f"COLL_UNKNOWN:  {window_counts['coll_unknown']:<8} ({pct(window_counts['coll_unknown'], window_total):.2f}%)")
+        print(f"TIMEOUT:       {window_counts['timeout']:<8} ({pct(window_counts['timeout'], window_total):.2f}%)")
+        print(f"TUMBLE:        {window_counts['tumble']:<8} ({pct(window_counts['tumble'], window_total):.2f}%)")
+        print(f"TERMINATED:    {window_counts['terminated']:<8} ({pct(window_counts['terminated'], window_total):.2f}%)")
+    else:
+        print("-" * 58)
+        print("No completed episodes in this checkpoint window.")
+
+    print("=" * 58 + "\n")
+
+
 def main():
     device = args_cli.device
 
-    # -------------------------
-    # Env config
-    # -------------------------
     env_cfg = parse_env_cfg(
         args_cli.task,
         device=device,
@@ -95,7 +165,6 @@ def main():
 
     env = gym.make(args_cli.task, cfg=env_cfg)
 
-    # Patch action space for TD3 normalized action [-1, 1]
     env.action_space = spaces.Box(
         low=-1.0,
         high=1.0,
@@ -117,9 +186,6 @@ def main():
     print(f"[INFO] state_dim: {state_dim}")
     print(f"[INFO] action_dim: {action_dim}")
 
-    # -------------------------
-    # TD3
-    # -------------------------
     agent = TD3Agent(
         state_dim=state_dim,
         action_dim=action_dim,
@@ -145,8 +211,6 @@ def main():
         device=device,
     )
 
-    # OU noise for smoother robot exploration.
-    # IMPORTANT: sample/reset is kept outside torch.inference_mode().
     ou_noise = OUNoise(
         num_envs=num_envs,
         action_dim=action_dim,
@@ -154,105 +218,79 @@ def main():
         sigma=args_cli.expl_noise,
     )
 
-    # -------------------------
-    # Save directory
-    # -------------------------
     timestamp = time.strftime("%Y%m%d_%H%M%S")
     save_dir = os.path.join("logs", args_cli.run_name, timestamp)
     os.makedirs(save_dir, exist_ok=True)
 
     print(f"[INFO] Saving checkpoints to: {save_dir}")
 
-    # -------------------------
-    # Episode tracking
-    # -------------------------
     global_step = 0
+    episode_count = 0
 
     episode_reward_sum = torch.zeros(num_envs, device=device)
     episode_step_count = torch.zeros(num_envs, dtype=torch.long, device=device)
 
-    episode_count = 0
+    total_counts = {
+        "success": 0,
+        "coll_dynamic": 0,
+        "coll_static": 0,
+        "coll_boundary": 0,
+        "coll_unknown": 0,
+        "timeout": 0,
+        "tumble": 0,
+        "terminated": 0,
+    }
 
-    success_count = 0
-    collision_count = 0
-    timeout_count = 0
-    tumble_count = 0
-    terminated_count = 0
+    window_counts = {k: 0 for k in total_counts}
 
-    # Rolling/window summary counters
-    window_success_count = 0
-    window_collision_count = 0
-    window_timeout_count = 0
-    window_tumble_count = 0
-    window_terminated_count = 0
     window_reward_sum = 0.0
     window_step_sum = 0
     window_start_episode = 0
 
-    # -------------------------
-    # Training loop
-    # -------------------------
+    window_env_steps = 0
+    window_action_linear_sum = 0.0
+    window_action_angular_abs_sum = 0.0
+    window_reward_step_sum = 0.0
+    window_done_sum = 0.0
+    window_start_time = time.time()
+
+    last_losses = {
+        "critic_loss": 0.0,
+        "actor_loss": 0.0,
+    }
+
     while simulation_app.is_running() and global_step < args_cli.total_steps:
-        # -------------------------
-        # Action selection
-        # -------------------------
         with torch.inference_mode():
             if global_step < args_cli.start_steps:
-                # Random observe phase
                 action = torch.empty((num_envs, action_dim), device=device).uniform_(-1.0, 1.0)
             else:
-                # Actor action only
                 action = agent.select_action(state)
 
-        # OU noise has internal state, so it must stay outside inference_mode.
         if global_step >= args_cli.start_steps:
             noise = ou_noise.sample()
             action = torch.clamp(action + noise, -1.0, 1.0)
 
-        # -------------------------
-        # Environment step
-        # -------------------------
         with torch.inference_mode():
             next_obs, reward, terminated, truncated, info = env.step(action)
             next_state = next_obs["policy"]
             done = terminated | truncated
 
-        # -------------------------
-        # Terminal reward injection
-        # -------------------------
         goal_reached_buf = get_env_buffer(env, "goal_reached_buf", num_envs, device)
         collision_buf = get_env_buffer(env, "collision_buf", num_envs, device)
         tumble_buf = get_env_buffer(env, "tumble_buf", num_envs, device)
 
+        collision_dynamic_buf = get_env_buffer(env, "collision_dynamic_buf", num_envs, device)
+        collision_static_buf = get_env_buffer(env, "collision_static_buf", num_envs, device)
+        collision_boundary_buf = get_env_buffer(env, "collision_boundary_buf", num_envs, device)
+
         reward = reward.clone()
 
-        reward = torch.where(
-            done & goal_reached_buf,
-            reward + 2500.0,
-            reward,
-        )
+        reward = torch.where(done & goal_reached_buf, reward + SUCCESS_REWARD, reward)
+        reward = torch.where(done & collision_buf, reward - COLLISION_PENALTY, reward)
+        reward = torch.where(done & tumble_buf, reward - TUMBLE_PENALTY, reward)
+        if TIMEOUT_PENALTY != 0.0:
+            reward = torch.where(truncated & ~goal_reached_buf & ~collision_buf & ~tumble_buf, reward - TIMEOUT_PENALTY, reward)
 
-        reward = torch.where(
-            done & collision_buf,
-            reward - 2000.0,
-            reward,
-        )
-
-        reward = torch.where(
-            done & tumble_buf,
-            reward - 2000.0,
-            reward,
-        )
-
-        reward = torch.where(
-            done & truncated,
-            reward - 500.0,
-            reward,
-        )
-
-        # -------------------------
-        # Store transition
-        # -------------------------
         replay_buffer.add(
             states=state,
             actions=action,
@@ -264,19 +302,27 @@ def main():
         episode_reward_sum += reward
         episode_step_count += 1
 
-        # -------------------------
-        # Episode outcome accounting
-        # -------------------------
+        # Window step stats only; no per-step printing.
+        window_env_steps += num_envs
+        window_reward_step_sum += reward.sum().item()
+        window_done_sum += done.sum().item()
+
+        # Normalized action stats. action[:, 0] is linear command, action[:, 1] angular command.
+        window_action_linear_sum += action[:, 0].sum().item()
+        if action_dim > 1:
+            window_action_angular_abs_sum += torch.abs(action[:, 1]).sum().item()
+
         if done.any():
             done_env_ids = torch.where(done)[0]
-
-            # Reset OU noise only for completed envs.
-            # IMPORTANT: this is outside inference_mode.
             ou_noise.reset(done_env_ids)
 
             goal_reached_buf = get_env_buffer(env, "goal_reached_buf", num_envs, device)
             collision_buf = get_env_buffer(env, "collision_buf", num_envs, device)
             tumble_buf = get_env_buffer(env, "tumble_buf", num_envs, device)
+
+            collision_dynamic_buf = get_env_buffer(env, "collision_dynamic_buf", num_envs, device)
+            collision_static_buf = get_env_buffer(env, "collision_static_buf", num_envs, device)
+            collision_boundary_buf = get_env_buffer(env, "collision_boundary_buf", num_envs, device)
 
             for env_id in done_env_ids.tolist():
                 episode_count += 1
@@ -285,24 +331,29 @@ def main():
                 epi_steps = episode_step_count[env_id].item()
 
                 if truncated[env_id]:
-                    timeout_count += 1
-                    window_timeout_count += 1
+                    outcome = "timeout"
 
                 elif goal_reached_buf[env_id]:
-                    success_count += 1
-                    window_success_count += 1
+                    outcome = "success"
 
                 elif collision_buf[env_id]:
-                    collision_count += 1
-                    window_collision_count += 1
+                    if collision_dynamic_buf[env_id]:
+                        outcome = "coll_dynamic"
+                    elif collision_static_buf[env_id]:
+                        outcome = "coll_static"
+                    elif collision_boundary_buf[env_id]:
+                        outcome = "coll_boundary"
+                    else:
+                        outcome = "coll_unknown"
 
                 elif tumble_buf[env_id]:
-                    tumble_count += 1
-                    window_tumble_count += 1
+                    outcome = "tumble"
 
                 else:
-                    terminated_count += 1
-                    window_terminated_count += 1
+                    outcome = "terminated"
+
+                total_counts[outcome] += 1
+                window_counts[outcome] += 1
 
                 window_reward_sum += epi_reward
                 window_step_sum += epi_steps
@@ -313,61 +364,57 @@ def main():
         state = next_state
         global_step += num_envs
 
-        # -------------------------
-        # Train TD3
-        # -------------------------
         if len(replay_buffer) >= args_cli.batch_size and global_step >= args_cli.start_steps:
-            agent.train(replay_buffer, args_cli.batch_size)
+            losses = agent.train(replay_buffer, args_cli.batch_size)
+            if losses is not None:
+                last_losses = losses
 
-        # -------------------------
-        # Save checkpoint
-        # -------------------------
         if global_step % args_cli.save_interval < num_envs:
             ckpt_path = os.path.join(save_dir, f"td3_step_{global_step}.pt")
             agent.save(ckpt_path)
 
-            window_total = (
-                window_success_count + window_collision_count
-                + window_timeout_count + window_tumble_count
-                + window_terminated_count
+            print_checkpoint_summary(
+                global_step=global_step,
+                ckpt_path=ckpt_path,
+                window_start_episode=window_start_episode,
+                episode_count=episode_count,
+                window_counts=window_counts,
+                window_reward_sum=window_reward_sum,
+                window_step_sum=window_step_sum,
+                window_env_steps=window_env_steps,
+                window_action_linear_sum=window_action_linear_sum,
+                window_action_angular_abs_sum=window_action_angular_abs_sum,
+                window_reward_step_sum=window_reward_step_sum,
+                window_done_sum=window_done_sum,
+                last_losses=last_losses,
+                replay_buffer=replay_buffer,
+                window_start_time=window_start_time,
             )
 
-            if window_total > 0:
-                avg_reward = window_reward_sum / window_total
-                avg_steps  = window_step_sum  / window_total
+            window_counts = {k: 0 for k in total_counts}
+            window_reward_sum = 0.0
+            window_step_sum = 0
+            window_start_episode = episode_count
 
-                print(f"\n========== CHECKPOINT SUMMARY | step {global_step} ==========")
-                print(f"Checkpoint: {ckpt_path}")
-                print(f"Episodes in window: {window_total}  ({window_start_episode + 1} - {episode_count})")
-                print(f"Avg reward: {avg_reward:.2f}   Avg steps: {avg_steps:.1f}")
-                print(f"SUCCESS:    {window_success_count:<8} ({100.0 * window_success_count / window_total:.2f}%)")
-                print(f"COLL_WALL:  {window_collision_count:<8} ({100.0 * window_collision_count / window_total:.2f}%)")
-                print(f"TIMEOUT:    {window_timeout_count:<8} ({100.0 * window_timeout_count / window_total:.2f}%)")
-                print(f"TUMBLE:     {window_tumble_count:<8} ({100.0 * window_tumble_count / window_total:.2f}%)")
-                print(f"TERMINATED: {window_terminated_count:<8} ({100.0 * window_terminated_count / window_total:.2f}%)")
-                print("=" * 58 + "\n")
+            window_env_steps = 0
+            window_action_linear_sum = 0.0
+            window_action_angular_abs_sum = 0.0
+            window_reward_step_sum = 0.0
+            window_done_sum = 0.0
+            window_start_time = time.time()
 
-                window_success_count    = 0
-                window_collision_count  = 0
-                window_timeout_count    = 0
-                window_tumble_count     = 0
-                window_terminated_count = 0
-                window_reward_sum       = 0.0
-                window_step_sum         = 0
-                window_start_episode    = episode_count
-
-    # -------------------------
-    # Final summary and save
-    # -------------------------
     total_finished = max(episode_count, 1)
 
     print("\n========== TRAINING SUMMARY ==========")
     print(f"Total episodes: {episode_count}")
-    print(f"SUCCESS:    {success_count:<8} ({100.0 * success_count / total_finished:.2f}%)")
-    print(f"COLL_WALL:  {collision_count:<8} ({100.0 * collision_count / total_finished:.2f}%)")
-    print(f"TIMEOUT:    {timeout_count:<8} ({100.0 * timeout_count / total_finished:.2f}%)")
-    print(f"TUMBLE:     {tumble_count:<8} ({100.0 * tumble_count / total_finished:.2f}%)")
-    print(f"TERMINATED: {terminated_count:<8} ({100.0 * terminated_count / total_finished:.2f}%)")
+    print(f"SUCCESS:       {total_counts['success']:<8} ({pct(total_counts['success'], total_finished):.2f}%)")
+    print(f"COLL_DYNAMIC:  {total_counts['coll_dynamic']:<8} ({pct(total_counts['coll_dynamic'], total_finished):.2f}%)")
+    print(f"COLL_STATIC:   {total_counts['coll_static']:<8} ({pct(total_counts['coll_static'], total_finished):.2f}%)")
+    print(f"COLL_BOUNDARY: {total_counts['coll_boundary']:<8} ({pct(total_counts['coll_boundary'], total_finished):.2f}%)")
+    print(f"COLL_UNKNOWN:  {total_counts['coll_unknown']:<8} ({pct(total_counts['coll_unknown'], total_finished):.2f}%)")
+    print(f"TIMEOUT:       {total_counts['timeout']:<8} ({pct(total_counts['timeout'], total_finished):.2f}%)")
+    print(f"TUMBLE:        {total_counts['tumble']:<8} ({pct(total_counts['tumble'], total_finished):.2f}%)")
+    print(f"TERMINATED:    {total_counts['terminated']:<8} ({pct(total_counts['terminated'], total_finished):.2f}%)")
     print("======================================\n")
 
     final_path = os.path.join(save_dir, "td3_final.pt")

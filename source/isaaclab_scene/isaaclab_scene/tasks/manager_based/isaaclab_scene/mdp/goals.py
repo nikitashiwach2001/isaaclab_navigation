@@ -2,107 +2,33 @@ import torch
 
 from isaaclab.envs import ManagerBasedRLEnv
 
+# Walls sit at ±2.425 m; keep 0.5 m clearance so the goal is never inside a wall
+ARENA_LIMIT = 1.9
+MIN_START_GOAL_DIST = 1.0
 
-GOAL_X_LIMIT = 2.0
-GOAL_Y_LIMIT = 2.0
+# local XY positions of static obstacles inside each arena
+OBSTACLE_POSITIONS_LOCAL = torch.zeros((0, 2))
 
-SAFE_GOAL_POINTS_LOCAL = torch.tensor([
+# goal must be at least this far from any obstacle center
+OBSTACLE_CLEARANCE = 0.4
 
-    # [ 1.45, 0.90], [ 0.90, 1.45], [-1.45, 0.65], [-0.90, 1.15], [ 1.45, -0.90], [ 0.90, -1.45], [-1.45, -0.90], [-0.90, -1.45],
-    # Original trained goals
-    [ 1.80,  0.90],
-    [ 0.90,  1.80],
+STAGE4_GOAL_POSITIONS = [
+    ( 2.0,  1.5), ( 1.8,  2.0), ( 1.5,  0.8),
+    ( 2.0, -1.5), ( 1.5, -1.8), ( 0.5, -2.0),
+    (-1.0, -2.0), (-1.8, -2.0), (-2.0, -0.8),
+    (-2.0,  0.8), (-2.0,  1.8), (-1.5,  2.0),
+    ( 0.0,  2.0), ( 0.5,  1.5), ( 1.8, -0.5),
+]
 
-    [-1.80,  0.70],
-    [-0.90,  1.80],
-
-    [ 1.80, -0.90],
-    [ 0.90, -1.80],
-
-    [-1.80, -0.90],
-    [-0.90, -1.80],
-
-    # Medium side goals
-    [ 1.60,  0.40],
-    [ 1.60, -0.40],
-    [-1.60,  0.40],
-    [-1.60, -0.40],
-
-    [ 0.40,  1.60],
-    [-0.40,  1.60],
-    [ 0.40, -1.60],
-    [-0.40, -1.60],
-
-    # Crossing-path goals for moving-obstacle learning
-    [ 1.80,  0.00],
-    [-1.80,  0.00],
-    [ 0.00,  1.80],
-    [ 0.00, -1.80],
-
-    [ 1.60,  1.60],
-    [-1.60,  1.60],
-    [ 1.60, -1.60],
-    [-1.60, -1.60],
-
-    # # Obstacle-passing goals - near path but not too close behind obstacles
-    # [ 1.80,  0.90],
-    # [ 0.90,  1.80],
-    # [-1.80,  0.70],
-    # [-0.90,  1.80],
-    # [ 1.80, -0.90],
-    # [ 0.90, -1.80],
-    # [-1.80, -0.90],
-    # [-0.90, -1.80],
-
-    # # Easier corner goals for stability
-    # [ 1.80,  1.80],
-    # [ 1.80, -1.80],
-    # [-1.80,  1.80],
-    # [-1.80, -1.80],
-])
-
-# SAFE_GOAL_POINTS_LOCAL = torch.tensor([
-#     # Hard goals near / behind obstacles
-#     [ 1.25,  0.80],
-#     [ 0.80,  1.25],
-
-#     [-1.25,  0.50],
-#     [-0.80,  0.95],
-
-#     [ 1.25, -0.80],
-#     [ 0.80, -1.25],
-
-#     [-1.25, -0.80],
-#     [-0.80, -1.25],
-
-    # Medium difficulty side goals
-    # [ 1.60,  0.40],
-    # [ 1.60, -0.40],
-    # [-1.60,  0.40],
-    # [-1.60, -0.40],
-    # [ 0.40,  1.60],
-    # [-0.40,  1.60],
-    # [ 0.40, -1.60],
-    # [-0.40, -1.60],
-
-    # Easier corner goals for stability
-    # [ 1.80,  1.80],
-    # [ 1.80, -1.80],
-    # [-1.80,  1.80],
-    # [-1.80, -1.80],
-# ])
 
 def ensure_goal_pos_w(env: ManagerBasedRLEnv) -> torch.Tensor:
-    """Create goal_pos_w if it does not exist yet."""
-
     if not hasattr(env, "goal_pos_w"):
         env.goal_pos_w = torch.zeros((env.num_envs, 2), device=env.device)
-
     return env.goal_pos_w
 
 
 def randomize_goal_positions(env: ManagerBasedRLEnv, env_ids: torch.Tensor | None = None):
-    """Randomize goal position for selected envs and move goal marker."""
+    """Place the goal at a random position at least MIN_START_GOAL_DIST away from the robot."""
 
     goal_pos_w = ensure_goal_pos_w(env)
 
@@ -112,46 +38,93 @@ def randomize_goal_positions(env: ManagerBasedRLEnv, env_ids: torch.Tensor | Non
     env_ids = env_ids.to(dtype=torch.long, device=env.device)
     num_reset_envs = len(env_ids)
 
-    # Random goal inside each local arena
-    safe_points = SAFE_GOAL_POINTS_LOCAL.to(env.device)
-    random_ids = torch.randint(
-        low=0,
-        high=safe_points.shape[0],
-        size=(num_reset_envs,),
-        device=env.device,
-    )
-    random_xy_local = safe_points[random_ids]
-
-    # Convert local env goal to world position
+    robot = env.scene["robot"]
     env_origins_xy = env.scene.env_origins[env_ids, :2]
+    robot_xy_local = robot.data.root_pos_w[env_ids, :2] - env_origins_xy
+
+    random_xy_local = (torch.rand((num_reset_envs, 2), device=env.device) * 2.0 - 1.0) * ARENA_LIMIT
+
+    obs_pos = OBSTACLE_POSITIONS_LOCAL.to(env.device)  # (num_obstacles, 2)
+
+    for _ in range(20):
+        too_close_to_robot = torch.norm(random_xy_local - robot_xy_local, dim=-1) < MIN_START_GOAL_DIST
+
+        # check every goal against every obstacle: (num_envs, num_obstacles)
+        dist_to_obs = torch.norm(random_xy_local.unsqueeze(1) - obs_pos.unsqueeze(0), dim=-1)
+        too_close_to_obs = (dist_to_obs < OBSTACLE_CLEARANCE).any(dim=-1)
+
+        too_close = too_close_to_robot | too_close_to_obs
+        if not too_close.any():
+            break
+        resampled = (torch.rand((int(too_close.sum()), 2), device=env.device) * 2.0 - 1.0) * ARENA_LIMIT
+        random_xy_local[too_close] = resampled
+
     goal_pos_w[env_ids] = env_origins_xy + random_xy_local
 
-    # Initialize reward distance buffers for selected envs
-    robot = env.scene["robot"]
-    robot_xy = robot.data.root_pos_w[env_ids, :2]
-    goal_xy = goal_pos_w[env_ids]
-
-    init_dist = torch.norm(goal_xy - robot_xy, dim=-1)
+    init_dist = torch.norm(goal_pos_w[env_ids] - robot.data.root_pos_w[env_ids, :2], dim=-1)
 
     if not hasattr(env, "goal_dist_initial"):
         env.goal_dist_initial = torch.zeros(env.num_envs, device=env.device)
-
     if not hasattr(env, "goal_dist_prev"):
         env.goal_dist_prev = torch.zeros(env.num_envs, device=env.device)
 
     env.goal_dist_initial[env_ids] = init_dist
     env.goal_dist_prev[env_ids] = init_dist
 
-    # Move visual goal marker to goal world position
     if "goal_marker" in env.scene.keys():
         goal_marker = env.scene["goal_marker"]
-
         goal_pose_w = goal_marker.data.root_pose_w.clone()
-
         goal_pose_w[env_ids, 0] = goal_pos_w[env_ids, 0]
         goal_pose_w[env_ids, 1] = goal_pos_w[env_ids, 1]
         goal_pose_w[env_ids, 2] = 0.08
+        goal_marker.write_root_pose_to_sim(goal_pose_w[env_ids], env_ids=env_ids)
 
+    return goal_pos_w
+
+
+
+
+def randomize_goal_positions_stage4(env: ManagerBasedRLEnv, env_ids: torch.Tensor | None = None):
+    """Pick a random goal from the predefined safe list for stage 4."""
+
+    goal_pos_w = ensure_goal_pos_w(env)
+
+    if env_ids is None:
+        env_ids = torch.arange(env.num_envs, device=env.device)
+
+    env_ids = env_ids.to(dtype=torch.long, device=env.device)
+    num_reset_envs = len(env_ids)
+
+    positions = torch.tensor(STAGE4_GOAL_POSITIONS, device=env.device, dtype=torch.float32)
+    env_origins_xy = env.scene.env_origins[env_ids, :2]
+    robot = env.scene["robot"]
+    robot_xy_local = robot.data.root_pos_w[env_ids, :2] - env_origins_xy
+
+    for _ in range(20):
+        idx = torch.randint(len(positions), (num_reset_envs,), device=env.device)
+        random_xy_local = positions[idx]
+        too_close = torch.norm(random_xy_local - robot_xy_local, dim=-1) < MIN_START_GOAL_DIST
+        if not too_close.any():
+            break
+
+    goal_pos_w[env_ids] = env_origins_xy + random_xy_local
+
+    init_dist = torch.norm(goal_pos_w[env_ids] - robot.data.root_pos_w[env_ids, :2], dim=-1)
+
+    if not hasattr(env, "goal_dist_initial"):
+        env.goal_dist_initial = torch.zeros(env.num_envs, device=env.device)
+    if not hasattr(env, "goal_dist_prev"):
+        env.goal_dist_prev = torch.zeros(env.num_envs, device=env.device)
+
+    env.goal_dist_initial[env_ids] = init_dist
+    env.goal_dist_prev[env_ids] = init_dist
+
+    if "goal_marker" in env.scene.keys():
+        goal_marker = env.scene["goal_marker"]
+        goal_pose_w = goal_marker.data.root_pose_w.clone()
+        goal_pose_w[env_ids, 0] = goal_pos_w[env_ids, 0]
+        goal_pose_w[env_ids, 1] = goal_pos_w[env_ids, 1]
+        goal_pose_w[env_ids, 2] = 0.08
         goal_marker.write_root_pose_to_sim(goal_pose_w[env_ids], env_ids=env_ids)
 
     return goal_pos_w

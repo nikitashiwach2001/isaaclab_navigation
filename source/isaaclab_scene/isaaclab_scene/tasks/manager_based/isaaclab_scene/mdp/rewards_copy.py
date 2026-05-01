@@ -365,3 +365,54 @@ class RewardsCfg:
     # reward = torch.where(collision, reward - COLLISION_PENALTY, reward)
 
     # return reward
+
+
+
+    ## original reward_B without spin penalty and deadlock penalty, which still learns to navigate around the moving obstacle but gets stuck near the static one
+
+    # def navigation_reward_B(env: ManagerBasedRLEnv) -> torch.Tensor:
+    # """Gazebo get_reward_B converted to Isaac Lab vectorized reward."""
+
+    # goal_dist, goal_angle = _get_goal_distance_and_angle(env)
+    # min_obstacle_dist = _get_lidar_min_distance(env)
+    # action_linear, action_angular = _get_real_actions(env)
+
+    # _ensure_reward_buffers(env, goal_dist)
+
+    # success = goal_dist < THRESHOLD_GOAL
+    # collision = min_obstacle_dist < THRESHOLD_COLLISION
+
+    # # [-3.14, 0]
+    # r_yaw = -torch.abs(goal_angle)
+    # r_yaw = torch.where(success, torch.zeros_like(r_yaw), r_yaw)
+
+    # # [-4, 0]
+    # r_vangular = -1.0 * (action_angular ** 2)
+
+    # # Delta-based progress reward
+    # r_distance = (env.goal_dist_prev - goal_dist) * 30.0
+    # env.goal_dist_prev[:] = goal_dist
+
+    # # [-20, 0]
+    # r_obstacle = torch.where(
+    #     min_obstacle_dist < 0.22,
+    #     torch.full_like(min_obstacle_dist, -20.0),
+    #     torch.zeros_like(min_obstacle_dist),
+    # )
+
+    # # Gazebo preferred forward velocity = 0.22
+    # r_vlinear = -1.0 * (((0.22 - action_linear) * 10.0) ** 2)
+
+    # reward = (
+    #     r_yaw
+    #     + r_distance
+    #     + r_obstacle
+    #     + r_vlinear
+    #     + r_vangular
+    #     - 1.0
+    # )
+
+    # reward = torch.where(success, reward + SUCCESS_REWARD, reward)
+    # reward = torch.where(collision, reward - COLLISION_PENALTY, reward)
+
+    # return reward

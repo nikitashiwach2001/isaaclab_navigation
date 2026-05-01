@@ -1,4 +1,3 @@
-import math
 import torch
 
 from isaaclab.envs import ManagerBasedRLEnv
@@ -6,7 +5,9 @@ from isaaclab.managers import RewardTermCfg as RewTerm
 from isaaclab.utils import configclass
 
 
-# Match Gazebo constants
+# -------------------------
+# Gazebo-style constants
+# -------------------------
 LIDAR_DISTANCE_CAP = 3.5
 
 MAX_LINEAR_SPEED = 0.35
@@ -20,12 +21,24 @@ THRESHOLD_COLLISION = 0.22
 SUCCESS_REWARD = 2500.0
 COLLISION_PENALTY = 2000.0
 
-# Choose reward function here: "A" or "B"
 REWARD_FUNCTION = "B"
 
 
-def _get_lidar_min_distance(env: ManagerBasedRLEnv) -> torch.Tensor:
-    """Return min lidar distance per env. Shape: [num_envs]."""
+def _get_lidar_distances(env: ManagerBasedRLEnv):
+    """
+    Return global min LiDAR distance and sector min distances.
+
+    Assumption:
+    - 40 rays
+    - ray_alignment = "yaw"
+    - ray 0 is robot forward
+    - rays are ordered circularly around the robot
+
+    Sectors:
+    - front: rays 0-4 and 36-39
+    - right: rays 5-14
+    - left: rays 26-35
+    """
 
     lidar = env.scene["lidar"]
 
@@ -43,7 +56,18 @@ def _get_lidar_min_distance(env: ManagerBasedRLEnv) -> torch.Tensor:
 
     ranges = torch.clamp(ranges, 0.0, LIDAR_DISTANCE_CAP)
 
-    return torch.min(ranges, dim=1).values
+    min_obstacle_dist = ranges.min(dim=1).values
+
+    front_min = torch.cat(
+        [ranges[:, :5], ranges[:, 36:]],
+        dim=1,
+    ).min(dim=1).values
+
+    right_min = ranges[:, 5:15].min(dim=1).values
+    left_min = ranges[:, 26:36].min(dim=1).values
+
+    return min_obstacle_dist, front_min, right_min, left_min
+
 
 def _get_goal_distance_and_angle(env: ManagerBasedRLEnv):
     """Return goal distance and goal angle per env."""
@@ -56,7 +80,6 @@ def _get_goal_distance_and_angle(env: ManagerBasedRLEnv):
     diff = goal_xy - robot_xy
 
     goal_dist = torch.norm(diff, dim=-1)
-
     heading_to_goal = torch.atan2(diff[:, 1], diff[:, 0])
 
     quat = robot.data.root_quat_w
@@ -74,7 +97,7 @@ def _get_goal_distance_and_angle(env: ManagerBasedRLEnv):
 
 
 def _get_real_actions(env: ManagerBasedRLEnv):
-    """Convert normalized action to real linear/angular velocities."""
+    """Convert normalized action [-1, 1] to real linear/angular velocity."""
 
     action = env.action_manager.action
 
@@ -106,58 +129,11 @@ def _ensure_reward_buffers(env: ManagerBasedRLEnv, goal_dist: torch.Tensor):
         env.goal_dist_prev = goal_dist.clone()
 
 
-def navigation_reward_A(env: ManagerBasedRLEnv) -> torch.Tensor:
-    """Gazebo get_reward_A converted to Isaac Lab vectorized reward."""
-
-    goal_dist, goal_angle = _get_goal_distance_and_angle(env)
-    min_obstacle_dist = _get_lidar_min_distance(env)
-    action_linear, action_angular = _get_real_actions(env)
-
-    _ensure_reward_buffers(env, goal_dist)
-
-    success = goal_dist < THRESHOLD_GOAL
-    collision = min_obstacle_dist < THRESHOLD_COLLISION
-
-    # [-3.14, 0] - Don't penalize yaw if goal is reached
-    r_yaw = -torch.abs(goal_angle)
-    r_yaw = torch.where(success, torch.zeros_like(r_yaw), r_yaw)
-
-    # [-4, 0]
-    r_vangular = -1.5 * (action_angular**2)
-
-    # [-1, 1]
-    denom = env.goal_dist_initial + goal_dist
-    denom = torch.clamp(denom, min=1e-6)
-    r_distance = (2.0 * env.goal_dist_initial) / denom - 1.0
-
-    # [-20, 0]
-    r_obstacle = torch.where(
-        min_obstacle_dist < 0.22,
-        torch.full_like(min_obstacle_dist, -20.0),
-        torch.zeros_like(min_obstacle_dist),
-    )
-    desired_linear = torch.where(
-    goal_dist < 0.50,
-    torch.full_like(goal_dist, 0.10),
-    torch.full_like(goal_dist, MAX_LINEAR_SPEED),)
-
-    # Penalize low forward speed, same as Gazebo
-    # r_vlinear = -(((0.22 - action_linear) * 10.0) ** 2)
-    r_vlinear = -(((desired_linear - action_linear) * 10.0) ** 2)
-
-    reward = r_yaw + r_distance + r_obstacle + r_vlinear + r_vangular - 1.0
-
-    reward = torch.where(success, reward + SUCCESS_REWARD, reward)
-    reward = torch.where(collision, reward - COLLISION_PENALTY, reward)
-
-    return reward
-
-
 def navigation_reward_B(env: ManagerBasedRLEnv) -> torch.Tensor:
-    """Gazebo-style reward B + mild anti-deadlock + moving-obstacle CP reward."""
+    """Gazebo-style Reward B with front/side LiDAR proximity shaping."""
 
+    min_obstacle_dist, front_min, right_min, left_min = _get_lidar_distances(env)
     goal_dist, goal_angle = _get_goal_distance_and_angle(env)
-    min_obstacle_dist = _get_lidar_min_distance(env)
     action_linear, action_angular = _get_real_actions(env)
 
     _ensure_reward_buffers(env, goal_dist)
@@ -165,137 +141,123 @@ def navigation_reward_B(env: ManagerBasedRLEnv) -> torch.Tensor:
     success = goal_dist < THRESHOLD_GOAL
     collision = min_obstacle_dist < THRESHOLD_COLLISION
 
-    # -----------------------------
-    # Basic Gazebo-style terms
-    # -----------------------------
     near_obstacle = min_obstacle_dist < 0.65
 
-    # r_yaw = -torch.abs(goal_angle)
-    # r_yaw = torch.where(success, torch.zeros_like(r_yaw), r_yaw)
-
+    # In open space, face the goal.
+    # Near obstacles, allow free detour direction.
     r_yaw = torch.where(
-    near_obstacle,
-    -0.3 * torch.abs(goal_angle),    # 70% reduced near obstacle
-    -1.0 * torch.abs(goal_angle),    # full penalty in open space
+        near_obstacle,
+        torch.zeros_like(goal_angle),
+        -1.0 * torch.abs(goal_angle),
     )
     r_yaw = torch.where(success, torch.zeros_like(r_yaw), r_yaw)
 
-    # Reduced angular penalty to allow committed detours
-    # r_vangular = -1.0 * (action_angular ** 2)
-    # 3. r_vangular — allow sharp turns freely near obstacle
+    # Allow sharper turns near obstacles, discourage spinning in open space.
     r_vangular = torch.where(
         near_obstacle,
-        -0.1 * (action_angular ** 2),    # near obstacle: turn freely
-        -0.5 * (action_angular ** 2),    # open space: discourage spinning
+        -0.1 * (action_angular ** 2),
+        -0.5 * (action_angular ** 2),
     )
 
+    # Gazebo Reward B progress term.
     progress = env.goal_dist_prev - goal_dist
     r_distance = progress * 30.0
     env.goal_dist_prev[:] = goal_dist
 
-    not_near_goal = goal_dist > 0.40
-    low_linear = action_linear < 0.08
-    no_progress = progress < 0.0003
-
-    # Mild stuck penalty
-    r_stuck = torch.where(
-        no_progress & not_near_goal,
-        torch.full_like(goal_dist, -0.35),
-        torch.zeros_like(goal_dist),
-    )
-
-    # Reduced freeze penalty, not too harsh
-    r_freeze = torch.where(
-        near_obstacle & low_linear & not_near_goal & no_progress,
-        torch.full_like(goal_dist, -0.5),
-        torch.zeros_like(goal_dist),
-    )
-
-    # Penalize rotate-in-place behavior
-    spin_penalty = torch.where(
-        (torch.abs(action_angular) > 0.7) & (action_linear < 0.08) & not_near_goal,
-        torch.full_like(goal_dist, -1.0),
-        torch.zeros_like(goal_dist),
-    )
-
-    # # Mild deadlock penalty
-    deadlock_penalty = torch.where(
-        no_progress & not_near_goal,
-        torch.full_like(goal_dist, -1.5),
-        torch.zeros_like(goal_dist),
-    )
-
-    # Gazebo-style obstacle danger penalty only near collision
+    # Emergency near-collision penalty.
     r_obstacle = torch.where(
-        min_obstacle_dist < 0.22,
+        min_obstacle_dist < THRESHOLD_COLLISION,
         torch.full_like(min_obstacle_dist, -20.0),
         torch.zeros_like(min_obstacle_dist),
     )
 
-    # Prefer forward movement
-    r_vlinear = -(((MAX_LINEAR_SPEED - action_linear) * 10.0) ** 2)
+    # Keep forward movement, but reduce forward incentive near obstacles.
+    r_forward = torch.where(
+        near_obstacle,
+        0.10 * action_linear,
+        0.30 * action_linear,
+    )
 
-    # -----------------------------
-    # Moving obstacle CP reward
-    # -----------------------------
+    # Directional proximity shaping.
+    # Front danger: obstacle in path.
+    r_prox_front = torch.where(
+        front_min < 0.50,
+        -8.0 * (0.50 - front_min),
+        torch.zeros_like(front_min),
+    )
+
+    # Side danger: obstacle crossing from left/right.
+    side_min = torch.minimum(right_min, left_min)
+
+    r_prox_sides = torch.where(
+        side_min < 0.45,
+        -6.0 * (0.45 - side_min),
+        torch.zeros_like(side_min),
+    )
+
+    r_proximity = r_prox_front + r_prox_sides
+
     r_cp = torch.zeros_like(goal_dist)
 
+    # Stage 3: single moving obstacle_3
+    # Stage 4: two moving obstacles (obstacle_1, obstacle_2)
+    _cp_obstacle_names = []
     if "obstacle_3" in env.scene.keys():
+        _cp_obstacle_names = ["obstacle_3"]
+    elif "obstacle_1" in env.scene.keys() and "obstacle_2" in env.scene.keys():
+        _cp_obstacle_names = ["obstacle_1", "obstacle_2"]
+
+    if _cp_obstacle_names:
         robot = env.scene["robot"]
-        obstacle = env.scene["obstacle_3"]
-
         robot_pos_xy = robot.data.root_pos_w[:, :2]
-        obstacle_pos_xy = obstacle.data.root_pos_w[:, :2]
-
-        # Use root linear velocity if available
         robot_vel_xy = robot.data.root_lin_vel_w[:, :2]
-        obstacle_vel_xy = obstacle.data.root_lin_vel_w[:, :2]
 
-        rel_pos = obstacle_pos_xy - robot_pos_xy
-        dist = torch.norm(rel_pos, dim=-1)
+        for obs_name in _cp_obstacle_names:
+            obstacle = env.scene[obs_name]
 
-        rel_vel = obstacle_vel_xy - robot_vel_xy
-        obstacle_speed = torch.norm(obstacle_vel_xy, dim=-1)
+            obstacle_pos_xy = obstacle.data.root_pos_w[:, :2]
+            obstacle_vel_xy = obstacle.data.root_lin_vel_w[:, :2]
 
-        # Positive closing speed means obstacle/robot are getting closer
-        closing_speed = -torch.sum(rel_pos * rel_vel, dim=-1) / torch.clamp(dist, min=1e-6)
+            rel_pos = obstacle_pos_xy - robot_pos_xy
+            dist = torch.norm(rel_pos, dim=-1)
 
-        approaching = closing_speed > 0.0
-        moving_obstacle = obstacle_speed > 0.02
+            rel_vel = obstacle_vel_xy - robot_vel_xy
+            obstacle_speed = torch.norm(obstacle_vel_xy, dim=-1)
 
-        ttc = dist / torch.clamp(closing_speed, min=1e-6)
+            closing_speed = -torch.sum(rel_pos * rel_vel, dim=-1) / torch.clamp(dist, min=1e-6)
 
-        pc_ttc = torch.where(
-            approaching,
-            torch.clamp(0.15 / torch.clamp(ttc, min=1e-6), 0.0, 1.0),
-            torch.zeros_like(dist),
-        )
+            approaching = closing_speed > 0.0
+            moving_obstacle = obstacle_speed > 0.02
 
-        pc_dist = torch.clamp(
-            (0.80 - dist) / (0.80 - THRESHOLD_COLLISION),
-            0.0,
-            1.0,
-        )
+            ttc = dist / torch.clamp(closing_speed, min=1e-6)
 
-        cp = 0.5 * pc_ttc + 0.5 * pc_dist
+            pc_ttc = torch.where(
+                approaching,
+                torch.clamp(0.15 / torch.clamp(ttc, min=1e-6), 0.0, 1.0),
+                torch.zeros_like(dist),
+            )
 
-        # CP only affects true moving obstacle
-        r_cp = torch.where(
-            moving_obstacle,
-            -1.5 * cp,
-            torch.zeros_like(cp),
-        )
+            pc_dist = torch.clamp(
+                (0.80 - dist) / (0.80 - THRESHOLD_COLLISION),
+                0.0,
+                1.0,
+            )
+
+            cp = 0.5 * pc_ttc + 0.5 * pc_dist
+
+            r_cp += torch.where(
+                moving_obstacle,
+                -1.5 * cp,
+                torch.zeros_like(cp),
+            )
 
     reward = (
         r_yaw
         + r_distance
         + r_obstacle
-        + r_vlinear
+        + r_forward
+        + r_proximity
         + r_vangular
-        + r_stuck
-        + r_freeze
-        + spin_penalty
-        + deadlock_penalty
         + r_cp
         - 1.0
     )
@@ -305,17 +267,14 @@ def navigation_reward_B(env: ManagerBasedRLEnv) -> torch.Tensor:
 
     return reward
 
+
 def navigation_reward(env: ManagerBasedRLEnv) -> torch.Tensor:
-    """Select reward function A or B."""
+    """Select reward function."""
 
-    if REWARD_FUNCTION == "A":
-        return navigation_reward_A(env)
-
-    elif REWARD_FUNCTION == "B":
+    if REWARD_FUNCTION == "B":
         return navigation_reward_B(env)
 
-    else:
-        raise ValueError(f"Unknown REWARD_FUNCTION: {REWARD_FUNCTION}")
+    raise ValueError(f"Unknown REWARD_FUNCTION: {REWARD_FUNCTION}")
 
 
 @configclass
