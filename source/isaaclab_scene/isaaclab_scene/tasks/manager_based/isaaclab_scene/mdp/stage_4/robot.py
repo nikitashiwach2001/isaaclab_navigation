@@ -37,7 +37,8 @@ LIDAR_CFG_4 = MultiMeshRayCasterCfg(
         channels=1,
         vertical_fov_range=(0.0, 0.0),
         horizontal_fov_range=(0.0, 360.0),
-        horizontal_res=8.9,  # 360 / 40 rays = 8.9 deg resolution
+        # horizontal_res=8.9,  # 360 / 40 rays = 8.9 deg resolution
+        horizontal_res=3.96,  # 360 / 90 rays = 4 deg resolution
     ),
     max_distance=3.5,
     debug_vis=False,
@@ -51,12 +52,12 @@ LIDAR_CFG_4 = MultiMeshRayCasterCfg(
             track_mesh_transforms=False
         ),
 
-        MultiMeshRayCasterCfg.RaycastTargetCfg(
-            prim_expr="{ENV_REGEX_NS}/InnerWall_.*",
-            is_shared=True,
-            merge_prim_meshes=True,
-            track_mesh_transforms=False
-        ),
+        # MultiMeshRayCasterCfg.RaycastTargetCfg(
+        #     prim_expr="{ENV_REGEX_NS}/InnerWall_.*",
+        #     is_shared=True,
+        #     merge_prim_meshes=True,
+        #     track_mesh_transforms=False
+        # ),
 
         # MultiMeshRayCasterCfg.RaycastTargetCfg(
         #     prim_expr="{ENV_REGEX_NS}/Obstacle_.*",

@@ -37,7 +37,9 @@ LIDAR_CFG = MultiMeshRayCasterCfg(
         channels=1,
         vertical_fov_range=(0.0, 0.0),
         horizontal_fov_range=(0.0, 360.0),
-        horizontal_res=8.9,  # 360 / 40 rays = 8.9 deg resolution
+        horizontal_res=3.96,  # 360 / 90 rays = 4.0 deg resolution
+        # horizontal_res = 8.9,  # 360 / 40 rays = 8.9 deg resolution
+
     ),
     max_distance=3.5,
     debug_vis=False,

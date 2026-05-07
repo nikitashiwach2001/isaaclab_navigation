@@ -416,3 +416,66 @@ class RewardsCfg:
     # reward = torch.where(collision, reward - COLLISION_PENALTY, reward)
 
     # return reward
+
+
+
+def navigation_reward_C(env: ManagerBasedRLEnv) -> torch.Tensor:
+    """Gazebo get_reward_B converted to Isaac Lab vectorized reward."""
+
+    goal_dist, goal_angle = _get_goal_distance_and_angle(env)
+    min_obstacle_dist = _get_lidar_min_distance(env)
+    action_linear, action_angular = _get_real_actions(env)
+
+    _ensure_reward_buffers(env, goal_dist)
+
+    success = goal_dist < THRESHOLD_GOAL
+    collision = min_obstacle_dist < THRESHOLD_COLLISION
+
+    near_obstacle = min_obstacle_dist < 0.65
+
+    # [-3.14, 0]
+    r_yaw = -torch.abs(goal_angle)
+    r_yaw = torch.where(success, torch.zeros_like(r_yaw), r_yaw)
+
+    r_vangular = -1.0 * (action_angular**2)
+
+    # Delta-based distance reward
+    r_distance = (env.goal_dist_prev - goal_dist) * 30.0
+    env.goal_dist_prev[:] = goal_dist
+
+    # no progress penealty
+    no_progress = r_distance < 0.005
+    not_near_goal = goal_dist > 0.40
+
+    r_stuck = torch.where(
+        no_progress & not_near_goal,
+        torch.full_like(goal_dist, -0.25),
+        torch.zeros_like(goal_dist),
+    )
+
+    
+    low_linear = action_linear < 0.08
+    not_near_goal = goal_dist > 0.40
+    no_progress = r_distance < 0.005
+
+    r_freeze = torch.where(
+        near_obstacle & low_linear & not_near_goal & no_progress,
+        torch.full_like(goal_dist, -1.0),
+        torch.zeros_like(goal_dist),
+    )
+
+    # Same as Gazebo: obstacle penalty when below 0.22m
+    r_obstacle = torch.where(
+        min_obstacle_dist < 0.22,
+        torch.full_like(min_obstacle_dist, -20.0),
+        torch.zeros_like(min_obstacle_dist),
+    )
+
+    r_vlinear = -(((MAX_LINEAR_SPEED - action_linear) * 10.0) ** 2)
+
+    reward = r_yaw + r_distance + r_obstacle + r_vlinear + r_vangular + r_stuck + r_freeze - 1.0
+
+    reward = torch.where(success, reward + SUCCESS_REWARD, reward)
+    reward = torch.where(collision, reward - COLLISION_PENALTY, reward)
+
+    return reward

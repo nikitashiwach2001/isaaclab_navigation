@@ -10,7 +10,11 @@ MIN_START_GOAL_DIST = 1.0
 OBSTACLE_POSITIONS_LOCAL = torch.zeros((0, 2))
 
 # goal must be at least this far from any obstacle center
-OBSTACLE_CLEARANCE = 0.4
+# obstacle radius 0.16 + goal threshold 0.25 + buffer = 0.5
+OBSTACLE_CLEARANCE = 0.5
+
+# obstacle names to avoid when placing goals
+_STAGE_OBSTACLE_NAMES = ["obstacle_1", "obstacle_2", "obstacle_3", "obstacle_4"]
 
 STAGE4_GOAL_POSITIONS = [
     ( 2.0,  1.5), ( 1.8,  2.0), ( 1.5,  0.8),
@@ -44,16 +48,18 @@ def randomize_goal_positions(env: ManagerBasedRLEnv, env_ids: torch.Tensor | Non
 
     random_xy_local = (torch.rand((num_reset_envs, 2), device=env.device) * 2.0 - 1.0) * ARENA_LIMIT
 
-    obs_pos = OBSTACLE_POSITIONS_LOCAL.to(env.device)  # (num_obstacles, 2)
-
     for _ in range(20):
-        too_close_to_robot = torch.norm(random_xy_local - robot_xy_local, dim=-1) < MIN_START_GOAL_DIST
+        too_close = torch.norm(random_xy_local - robot_xy_local, dim=-1) < MIN_START_GOAL_DIST
 
-        # check every goal against every obstacle: (num_envs, num_obstacles)
-        dist_to_obs = torch.norm(random_xy_local.unsqueeze(1) - obs_pos.unsqueeze(0), dim=-1)
-        too_close_to_obs = (dist_to_obs < OBSTACLE_CLEARANCE).any(dim=-1)
+        # check against each obstacle's current world position
+        for obs_name in _STAGE_OBSTACLE_NAMES:
+            if obs_name not in env.scene.keys():
+                continue
+            obs_xy_w = env.scene[obs_name].data.root_pos_w[env_ids, :2]
+            obs_xy_local = obs_xy_w - env_origins_xy
+            dist = torch.norm(random_xy_local - obs_xy_local, dim=-1)
+            too_close = too_close | (dist < OBSTACLE_CLEARANCE)
 
-        too_close = too_close_to_robot | too_close_to_obs
         if not too_close.any():
             break
         resampled = (torch.rand((int(too_close.sum()), 2), device=env.device) * 2.0 - 1.0) * ARENA_LIMIT

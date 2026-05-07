@@ -41,6 +41,31 @@ parser.add_argument("--save_interval", type=int, default=25_000)
 parser.add_argument("--run_name", type=str, default="td3_turtlebot_nav")
 parser.add_argument("--load_checkpoint", type=str, default=None, help="Path to TD3 checkpoint to load for finetuning.")
 
+# -------------------------
+# Stage mode
+# -------------------------
+parser.add_argument(
+    "--stage_mode",
+    type=str,
+    default="goal",
+    choices=["goal", "survival"],
+    help=(
+        "goal = normal goal-reaching training. "
+        "survival = Stage A1 local obstacle avoidance, where clean timeout means survived."
+    ),
+)
+
+# -------------------------
+# Terminal rewards
+# -------------------------
+parser.add_argument("--success_reward", type=float, default=2500.0)
+parser.add_argument("--collision_penalty", type=float, default=2000.0)
+parser.add_argument("--tumble_penalty", type=float, default=2000.0)
+parser.add_argument("--timeout_penalty", type=float, default=300.0)
+
+# Used only when --stage_mode survival
+parser.add_argument("--survival_reward", type=float, default=300.0)
+
 AppLauncher.add_app_launcher_args(parser)
 args_cli = parser.parse_args()
 
@@ -70,15 +95,6 @@ from td3.td3_agent import TD3Agent
 from td3.noise import OUNoise
 
 
-# -------------------------
-# Terminal reward constants
-# -------------------------
-SUCCESS_REWARD    =  2500.0
-COLLISION_PENALTY =  2000.0
-TUMBLE_PENALTY    =  2000.0
-TIMEOUT_PENALTY   =  300.0   # set to e.g. 500.0 for stage 4
-
-
 def get_env_buffer(env, name: str, num_envs: int, device) -> torch.Tensor:
     """Safely get a bool buffer from env.unwrapped."""
     return getattr(
@@ -90,6 +106,42 @@ def get_env_buffer(env, name: str, num_envs: int, device) -> torch.Tensor:
 
 def pct(count: int, total: int) -> float:
     return 100.0 * count / max(total, 1)
+
+
+def make_count_dict():
+    """
+    Keep all keys available for both training modes.
+
+    In goal mode:
+        SUCCESS and TIMEOUT are meaningful.
+
+    In survival mode:
+        SURVIVED is meaningful.
+        TIMEOUT is not failure anymore.
+    """
+    return {
+        "success": 0,
+        "survived": 0,
+        "coll_dynamic": 0,
+        "coll_static": 0,
+        "coll_boundary": 0,
+        "coll_unknown": 0,
+        "timeout": 0,
+        "tumble": 0,
+        "terminated": 0,
+    }
+
+
+def print_outcome_counts(counts, total):
+    print(f"SUCCESS:       {counts['success']:<8} ({pct(counts['success'], total):.2f}%)")
+    print(f"SURVIVED:      {counts['survived']:<8} ({pct(counts['survived'], total):.2f}%)")
+    print(f"COLL_DYNAMIC:  {counts['coll_dynamic']:<8} ({pct(counts['coll_dynamic'], total):.2f}%)")
+    print(f"COLL_STATIC:   {counts['coll_static']:<8} ({pct(counts['coll_static'], total):.2f}%)")
+    print(f"COLL_BOUNDARY: {counts['coll_boundary']:<8} ({pct(counts['coll_boundary'], total):.2f}%)")
+    print(f"COLL_UNKNOWN:  {counts['coll_unknown']:<8} ({pct(counts['coll_unknown'], total):.2f}%)")
+    print(f"TIMEOUT:       {counts['timeout']:<8} ({pct(counts['timeout'], total):.2f}%)")
+    print(f"TUMBLE:        {counts['tumble']:<8} ({pct(counts['tumble'], total):.2f}%)")
+    print(f"TERMINATED:    {counts['terminated']:<8} ({pct(counts['terminated'], total):.2f}%)")
 
 
 def print_checkpoint_summary(
@@ -138,28 +190,7 @@ def print_checkpoint_summary(
         print(f"Avg episode reward: {avg_reward:.2f}")
         print(f"Avg episode steps:  {avg_steps:.1f}")
 
-        total_coll = (
-            window_counts['coll_dynamic'] + window_counts['coll_static']
-            + window_counts['coll_boundary'] + window_counts['coll_unknown']
-        )
-        has_coll_subtypes = (
-            window_counts['coll_dynamic'] > 0
-            or window_counts['coll_static'] > 0
-            or window_counts['coll_boundary'] > 0
-        )
-
-        print(f"SUCCESS:       {window_counts['success']:<8} ({pct(window_counts['success'], window_total):.2f}%)")
-        if has_coll_subtypes:
-            print(f"COLL_DYNAMIC:  {window_counts['coll_dynamic']:<8} ({pct(window_counts['coll_dynamic'], window_total):.2f}%)")
-            print(f"COLL_STATIC:   {window_counts['coll_static']:<8} ({pct(window_counts['coll_static'], window_total):.2f}%)")
-            print(f"COLL_BOUNDARY: {window_counts['coll_boundary']:<8} ({pct(window_counts['coll_boundary'], window_total):.2f}%)")
-            if window_counts['coll_unknown'] > 0:
-                print(f"COLL_UNKNOWN:  {window_counts['coll_unknown']:<8} ({pct(window_counts['coll_unknown'], window_total):.2f}%)")
-        else:
-            print(f"COLLISION:     {total_coll:<8} ({pct(total_coll, window_total):.2f}%)")
-        print(f"TIMEOUT:       {window_counts['timeout']:<8} ({pct(window_counts['timeout'], window_total):.2f}%)")
-        print(f"TUMBLE:        {window_counts['tumble']:<8} ({pct(window_counts['tumble'], window_total):.2f}%)")
-        print(f"TERMINATED:    {window_counts['terminated']:<8} ({pct(window_counts['terminated'], window_total):.2f}%)")
+        print_outcome_counts(window_counts, window_total)
     else:
         print("-" * 58)
         print("No completed episodes in this checkpoint window.")
@@ -167,8 +198,33 @@ def print_checkpoint_summary(
     print("=" * 58 + "\n")
 
 
+def classify_collision_outcome(
+    *,
+    env_id: int,
+    collision_dynamic_buf,
+    collision_static_buf,
+    collision_boundary_buf,
+) -> str:
+    if collision_dynamic_buf[env_id]:
+        return "coll_dynamic"
+    if collision_static_buf[env_id]:
+        return "coll_static"
+    if collision_boundary_buf[env_id]:
+        return "coll_boundary"
+    return "coll_unknown"
+
+
 def main():
     device = args_cli.device
+
+    print("\n========== TRAINING MODE ==========")
+    print(f"stage_mode:        {args_cli.stage_mode}")
+    print(f"success_reward:    {args_cli.success_reward}")
+    print(f"survival_reward:   {args_cli.survival_reward}")
+    print(f"collision_penalty: {args_cli.collision_penalty}")
+    print(f"tumble_penalty:    {args_cli.tumble_penalty}")
+    print(f"timeout_penalty:   {args_cli.timeout_penalty}")
+    print("===================================\n")
 
     env_cfg = parse_env_cfg(
         args_cli.task,
@@ -244,18 +300,8 @@ def main():
     episode_reward_sum = torch.zeros(num_envs, device=device)
     episode_step_count = torch.zeros(num_envs, dtype=torch.long, device=device)
 
-    total_counts = {
-        "success": 0,
-        "coll_dynamic": 0,
-        "coll_static": 0,
-        "coll_boundary": 0,
-        "coll_unknown": 0,
-        "timeout": 0,
-        "tumble": 0,
-        "terminated": 0,
-    }
-
-    window_counts = {k: 0 for k in total_counts}
+    total_counts = make_count_dict()
+    window_counts = make_count_dict()
 
     window_reward_sum = 0.0
     window_step_sum = 0
@@ -299,11 +345,30 @@ def main():
 
         reward = reward.clone()
 
-        reward = torch.where(done & goal_reached_buf, reward + SUCCESS_REWARD, reward)
-        reward = torch.where(done & collision_buf, reward - COLLISION_PENALTY, reward)
-        reward = torch.where(done & tumble_buf, reward - TUMBLE_PENALTY, reward)
-        if TIMEOUT_PENALTY != 0.0:
-            reward = torch.where(truncated & ~goal_reached_buf & ~collision_buf & ~tumble_buf, reward - TIMEOUT_PENALTY, reward)
+        # -------------------------------------------------
+        # Terminal reward handling
+        # -------------------------------------------------
+        if args_cli.stage_mode == "goal":
+            # Original goal-reaching behavior.
+            reward = torch.where(done & goal_reached_buf, reward + args_cli.success_reward, reward)
+            reward = torch.where(done & collision_buf, reward - args_cli.collision_penalty, reward)
+            reward = torch.where(done & tumble_buf, reward - args_cli.tumble_penalty, reward)
+
+            if args_cli.timeout_penalty != 0.0:
+                clean_timeout = truncated & ~goal_reached_buf & ~collision_buf & ~tumble_buf
+                reward = torch.where(clean_timeout, reward - args_cli.timeout_penalty, reward)
+
+        elif args_cli.stage_mode == "survival":
+            # Stage A1 behavior.
+            # A clean 50-second timeout is success/survival, not failure.
+            clean_survival = truncated & ~collision_buf & ~tumble_buf
+
+            reward = torch.where(clean_survival, reward + args_cli.survival_reward, reward)
+            reward = torch.where(done & collision_buf, reward - args_cli.collision_penalty, reward)
+            reward = torch.where(done & tumble_buf, reward - args_cli.tumble_penalty, reward)
+
+        else:
+            raise ValueError(f"Unknown stage_mode: {args_cli.stage_mode}")
 
         replay_buffer.add(
             states=state,
@@ -344,27 +409,51 @@ def main():
                 epi_reward = episode_reward_sum[env_id].item()
                 epi_steps = episode_step_count[env_id].item()
 
-                if truncated[env_id]:
-                    outcome = "timeout"
+                # -------------------------------------------------
+                # Outcome classification
+                # -------------------------------------------------
+                if args_cli.stage_mode == "goal":
+                    if goal_reached_buf[env_id]:
+                        outcome = "success"
 
-                elif goal_reached_buf[env_id]:
-                    outcome = "success"
+                    elif collision_buf[env_id]:
+                        outcome = classify_collision_outcome(
+                            env_id=env_id,
+                            collision_dynamic_buf=collision_dynamic_buf,
+                            collision_static_buf=collision_static_buf,
+                            collision_boundary_buf=collision_boundary_buf,
+                        )
 
-                elif collision_buf[env_id]:
-                    if collision_dynamic_buf[env_id]:
-                        outcome = "coll_dynamic"
-                    elif collision_static_buf[env_id]:
-                        outcome = "coll_static"
-                    elif collision_boundary_buf[env_id]:
-                        outcome = "coll_boundary"
+                    elif tumble_buf[env_id]:
+                        outcome = "tumble"
+
+                    elif truncated[env_id]:
+                        outcome = "timeout"
+
                     else:
-                        outcome = "coll_unknown"
+                        outcome = "terminated"
 
-                elif tumble_buf[env_id]:
-                    outcome = "tumble"
+                elif args_cli.stage_mode == "survival":
+                    if collision_buf[env_id]:
+                        outcome = classify_collision_outcome(
+                            env_id=env_id,
+                            collision_dynamic_buf=collision_dynamic_buf,
+                            collision_static_buf=collision_static_buf,
+                            collision_boundary_buf=collision_boundary_buf,
+                        )
+
+                    elif tumble_buf[env_id]:
+                        outcome = "tumble"
+
+                    elif truncated[env_id]:
+                        # Clean 50-second episode end.
+                        outcome = "survived"
+
+                    else:
+                        outcome = "terminated"
 
                 else:
-                    outcome = "terminated"
+                    raise ValueError(f"Unknown stage_mode: {args_cli.stage_mode}")
 
                 total_counts[outcome] += 1
                 window_counts[outcome] += 1
@@ -405,7 +494,7 @@ def main():
                 window_start_time=window_start_time,
             )
 
-            window_counts = {k: 0 for k in total_counts}
+            window_counts = make_count_dict()
             window_reward_sum = 0.0
             window_step_sum = 0
             window_start_episode = episode_count
@@ -419,30 +508,9 @@ def main():
 
     total_finished = max(episode_count, 1)
 
-    total_coll_final = (
-        total_counts['coll_dynamic'] + total_counts['coll_static']
-        + total_counts['coll_boundary'] + total_counts['coll_unknown']
-    )
-    has_coll_subtypes_final = (
-        total_counts['coll_dynamic'] > 0
-        or total_counts['coll_static'] > 0
-        or total_counts['coll_boundary'] > 0
-    )
-
     print("\n========== TRAINING SUMMARY ==========")
     print(f"Total episodes: {episode_count}")
-    print(f"SUCCESS:       {total_counts['success']:<8} ({pct(total_counts['success'], total_finished):.2f}%)")
-    if has_coll_subtypes_final:
-        print(f"COLL_DYNAMIC:  {total_counts['coll_dynamic']:<8} ({pct(total_counts['coll_dynamic'], total_finished):.2f}%)")
-        print(f"COLL_STATIC:   {total_counts['coll_static']:<8} ({pct(total_counts['coll_static'], total_finished):.2f}%)")
-        print(f"COLL_BOUNDARY: {total_counts['coll_boundary']:<8} ({pct(total_counts['coll_boundary'], total_finished):.2f}%)")
-        if total_counts['coll_unknown'] > 0:
-            print(f"COLL_UNKNOWN:  {total_counts['coll_unknown']:<8} ({pct(total_counts['coll_unknown'], total_finished):.2f}%)")
-    else:
-        print(f"COLLISION:     {total_coll_final:<8} ({pct(total_coll_final, total_finished):.2f}%)")
-    print(f"TIMEOUT:       {total_counts['timeout']:<8} ({pct(total_counts['timeout'], total_finished):.2f}%)")
-    print(f"TUMBLE:        {total_counts['tumble']:<8} ({pct(total_counts['tumble'], total_finished):.2f}%)")
-    print(f"TERMINATED:    {total_counts['terminated']:<8} ({pct(total_counts['terminated'], total_finished):.2f}%)")
+    print_outcome_counts(total_counts, total_finished)
     print("======================================\n")
 
     final_path = os.path.join(save_dir, "td3_final.pt")

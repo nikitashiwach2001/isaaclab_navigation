@@ -30,33 +30,16 @@ def _inner_wall(prim_path, pos, rot):
 class Stage4SceneCfg(BaseSceneCfg):
     """Stage 4: four outer walls + seven inner walls. No moving obstacles."""
 
-    # inner_wall_1: RigidObjectCfg = _inner_wall("{ENV_REGEX_NS}/InnerWall_1", (-2.0, -1.5, 0.25), (1.0, 0.0, 0.0, 0.0))
-    inner_wall_2: RigidObjectCfg = _inner_wall("{ENV_REGEX_NS}/InnerWall_2", (-0.5, -2.0, 0.25), (0.707, 0.0, 0.0, -0.707))
-    inner_wall_3: RigidObjectCfg = _inner_wall("{ENV_REGEX_NS}/InnerWall_3", ( 1.0, -1.0, 0.25), (0.707, 0.0, 0.0,  0.707))
-    # inner_wall_4: RigidObjectCfg = _inner_wall("{ENV_REGEX_NS}/InnerWall_4", ( 1.2,  1.9, 0.25), (0.707, 0.0, 0.0, -0.707))
-    # inner_wall_5: RigidObjectCfg = _inner_wall("{ENV_REGEX_NS}/InnerWall_5", ( 1.9,  0.4, 0.25), (1.0, 0.0, 0.0,  0.0))
-    inner_wall_6: RigidObjectCfg = _inner_wall("{ENV_REGEX_NS}/InnerWall_6", (-0.5,  1.5, 0.25), (1.0, 0.0, 0.0,  0.0))
+    # # inner_wall_1: RigidObjectCfg = _inner_wall("{ENV_REGEX_NS}/InnerWall_1", (-2.0, -1.5, 0.25), (1.0, 0.0, 0.0, 0.0))
+    # inner_wall_2: RigidObjectCfg = _inner_wall("{ENV_REGEX_NS}/InnerWall_2", (-0.5, -2.0, 0.25), (0.707, 0.0, 0.0, -0.707))
+    # inner_wall_3: RigidObjectCfg = _inner_wall("{ENV_REGEX_NS}/InnerWall_3", ( 1.0, -1.0, 0.25), (0.707, 0.0, 0.0,  0.707))
+    # # inner_wall_4: RigidObjectCfg = _inner_wall("{ENV_REGEX_NS}/InnerWall_4", ( 1.2,  1.9, 0.25), (0.707, 0.0, 0.0, -0.707))
+    # # inner_wall_5: RigidObjectCfg = _inner_wall("{ENV_REGEX_NS}/InnerWall_5", ( 1.9,  0.4, 0.25), (1.0, 0.0, 0.0,  0.0))
+    # inner_wall_6: RigidObjectCfg = _inner_wall("{ENV_REGEX_NS}/InnerWall_6", (-0.5,  1.5, 0.25), (1.0, 0.0, 0.0,  0.0))
     # inner_wall_7: RigidObjectCfg = _inner_wall("{ENV_REGEX_NS}/InnerWall_7", (-1.2,  0.092, 0.25), (0.707, 0.0, 0.0, -0.707))
 
     obstacle_1: RigidObjectCfg = STAGE4_OBSTACLE_1_CFG.replace(prim_path="{ENV_REGEX_NS}/Obstacle_1")
     obstacle_2: RigidObjectCfg = STAGE4_OBSTACLE_2_CFG.replace(prim_path="{ENV_REGEX_NS}/Obstacle_2")
-
-    obstacle_3: RigidObjectCfg = RigidObjectCfg(
-        prim_path="{ENV_REGEX_NS}/Obstacle_3",
-        spawn=sim_utils.CylinderCfg(
-            radius=0.07,
-            height=1.5,
-            axis="Z",
-            rigid_props=sim_utils.RigidBodyPropertiesCfg(kinematic_enabled=True),
-            mass_props=sim_utils.MassPropertiesCfg(mass=0.0),
-            collision_props=sim_utils.CollisionPropertiesCfg(),
-            visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.1, 0.3, 0.9)),
-        ),
-        init_state=RigidObjectCfg.InitialStateCfg(
-            pos=(0.5, 0.5, 0.75),
-            rot=(1.0, 0.0, 0.0, 0.0),
-        ),
-    )
 
 
 @configclass
@@ -80,3 +63,4 @@ class Stage4EnvCfg(BaseEnvCfg):
 
     scene: Stage4SceneCfg = Stage4SceneCfg()
     events: Stage4EventsCfg = Stage4EventsCfg()
+    enable_lidar_temporal_diff: bool = False

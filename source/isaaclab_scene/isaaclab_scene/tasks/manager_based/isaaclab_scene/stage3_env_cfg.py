@@ -8,6 +8,7 @@ from .mdp import (
     OBSTACLE_2_CFG,
     OBSTACLE_3_CFG,
     OBSTACLE_4_CFG,
+    LIDAR_CFG,
     update_rotating_obstacles,
 )
 
@@ -15,6 +16,8 @@ from .mdp import (
 @configclass
 class Stage3SceneCfg(BaseSceneCfg):
     """Stage 3: four walls + pinwheel (4 kinematic cylinders rotating together)."""
+
+    lidar = LIDAR_CFG.replace(offset=LIDAR_CFG.OffsetCfg(pos=(0.0, 0.0, 0.25)))
 
     obstacle_1: RigidObjectCfg = OBSTACLE_1_CFG.replace(prim_path="{ENV_REGEX_NS}/Obstacle_1")
     obstacle_2: RigidObjectCfg = OBSTACLE_2_CFG.replace(prim_path="{ENV_REGEX_NS}/Obstacle_2")
@@ -39,3 +42,4 @@ class Stage3EnvCfg(BaseEnvCfg):
 
     scene: Stage3SceneCfg = Stage3SceneCfg()
     events: Stage3EventsCfg = Stage3EventsCfg()
+    enable_lidar_temporal_diff: bool = True

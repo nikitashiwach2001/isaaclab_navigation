@@ -17,6 +17,10 @@ from .mdp import (
     LIDAR_CFG,
     CONTACT_SENSOR_CFG,
     GOAL_MARKER_CFG,
+    OBSTACLE_1_CFG,
+    OBSTACLE_2_CFG,
+    OBSTACLE_3_CFG,
+    OBSTACLE_4_CFG,
 )
 
 from .mdp.stage_4.robot import LIDAR_CFG_4
@@ -100,6 +104,11 @@ class BaseSceneCfg(InteractiveSceneCfg):
         ),
     )
 
+    # obstacle_1: RigidObjectCfg = OBSTACLE_1_CFG.replace(prim_path="{ENV_REGEX_NS}/Obstacle_1")
+    # obstacle_2: RigidObjectCfg = OBSTACLE_2_CFG.replace(prim_path="{ENV_REGEX_NS}/Obstacle_2")
+    # obstacle_3: RigidObjectCfg = OBSTACLE_3_CFG.replace(prim_path="{ENV_REGEX_NS}/Obstacle_3")
+    # obstacle_4: RigidObjectCfg = OBSTACLE_4_CFG.replace(prim_path="{ENV_REGEX_NS}/Obstacle_4")
+    
     robot: ArticulationCfg = TURTLEBOT3_BURGER_CFG
     # lidar: RayCasterCfg = LIDAR_CFG.replace(offset=RayCasterCfg.OffsetCfg(pos=(0.0, 0.0, 0.25)))
     lidar: RayCasterCfg = LIDAR_CFG_4.replace(offset=RayCasterCfg.OffsetCfg(pos=(0.0, 0.0, 0.25)))
@@ -127,10 +136,16 @@ class BaseEnvCfg(ManagerBasedRLEnvCfg):
     """Shared RL settings: observations, actions, rewards, terminations.
     Stage configs inherit this and plug in their own scene and events."""
 
+    # # for stage1 and stage 2
+    # scene: BaseSceneCfg = BaseSceneCfg()
+    # events: BaseEventsCfg = BaseEventsCfg()
+
     observations: ObservationsCfg = ObservationsCfg()
     actions: ActionsCfg = ActionsCfg()
     rewards: RewardsCfg = RewardsCfg()
     terminations: TerminationsCfg = TerminationsCfg()
+    
+    enable_lidar_temporal_diff: bool = False
 
     def __post_init__(self) -> None:
         self.decimation = 2
