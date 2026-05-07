@@ -40,6 +40,7 @@ parser.add_argument("--save_interval", type=int, default=25_000)
 
 parser.add_argument("--run_name", type=str, default="td3_turtlebot_nav")
 parser.add_argument("--load_checkpoint", type=str, default=None, help="Path to TD3 checkpoint to load for finetuning.")
+parser.add_argument("--reset_critic", action="store_true", default=False, help="Load actor weights only; re-init critic fresh. Use when reward scale changes between runs.")
 
 AppLauncher.add_app_launcher_args(parser)
 args_cli = parser.parse_args()
@@ -73,10 +74,10 @@ from td3.noise import OUNoise
 # -------------------------
 # Terminal reward constants
 # -------------------------
-SUCCESS_REWARD    =  2500.0
-COLLISION_PENALTY =  2000.0
-TUMBLE_PENALTY    =  2000.0
-TIMEOUT_PENALTY   =  300.0   # set to e.g. 500.0 for stage 4
+SUCCESS_REWARD    =  300.0
+COLLISION_PENALTY =  200.0
+TUMBLE_PENALTY    =  200.0
+TIMEOUT_PENALTY   =  10.0
 
 
 def get_env_buffer(env, name: str, num_envs: int, device) -> torch.Tensor:
@@ -215,8 +216,12 @@ def main():
     )
 
     if args_cli.load_checkpoint is not None:
-        agent.load(args_cli.load_checkpoint)
-        print(f"[INFO] Loaded checkpoint for finetuning: {args_cli.load_checkpoint}")
+        if args_cli.reset_critic:
+            agent.load_actor_only(args_cli.load_checkpoint)
+            print(f"[INFO] Loaded ACTOR ONLY from: {args_cli.load_checkpoint} (critic is fresh)")
+        else:
+            agent.load(args_cli.load_checkpoint)
+            print(f"[INFO] Loaded full checkpoint: {args_cli.load_checkpoint}")
 
     replay_buffer = ReplayBuffer(
         state_dim=state_dim,

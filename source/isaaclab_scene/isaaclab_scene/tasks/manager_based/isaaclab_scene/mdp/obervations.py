@@ -90,7 +90,7 @@ def lidar_temporal_sector_diff(env: ManagerBasedRLEnv) -> torch.Tensor:
     """
 
     
-    enable_temporal = getattr(env.cfg, "enable_lidar_temporal_diff", False)
+    enable_temporal = getattr(env.cfg, "enable_lidar_temporal_diff", True)
 
     if not enable_temporal:
         if not hasattr(env, "debug_temporal_disabled_printed"):
@@ -135,7 +135,7 @@ def lidar_temporal_sector_diff(env: ManagerBasedRLEnv) -> torch.Tensor:
 
     # Deadband: 0.001 passes obstacle motion (~0.0015/step); clamp large spikes from robot rotation
     sector_diff = torch.where(
-        torch.abs(sector_diff) < 0.001,
+        torch.abs(sector_diff) < 0.0003,
         torch.zeros_like(sector_diff),
         sector_diff,
     )
@@ -143,12 +143,12 @@ def lidar_temporal_sector_diff(env: ManagerBasedRLEnv) -> torch.Tensor:
 
     env.prev_lidar_scan = current_lidar.clone()
 
-    if not hasattr(env, "_temporal_debug_step"):
-        env._temporal_debug_step = 0
-    env._temporal_debug_step += 1
-    if env._temporal_debug_step % 500 == 0:
-        nonzero_frac = (sector_diff.abs() > 0).float().mean().item()
-        print(f"[temporal] non-zero fraction: {nonzero_frac:.3f}, max: {sector_diff.abs().max().item():.5f}")
+    # if not hasattr(env, "_temporal_debug_step"):
+    #     env._temporal_debug_step = 0
+    # env._temporal_debug_step += 1
+    # if env._temporal_debug_step % 500 == 0:
+    #     nonzero_frac = (sector_diff.abs() > 0).float().mean().item()
+        # print(f"[temporal] non-zero fraction: {nonzero_frac:.3f}, max: {sector_diff.abs().max().item():.5f}")
 
     return sector_diff
 

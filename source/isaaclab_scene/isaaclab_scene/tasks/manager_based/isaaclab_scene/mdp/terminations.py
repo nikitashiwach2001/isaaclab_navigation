@@ -178,7 +178,6 @@ def tumble(env: ManagerBasedRLEnv) -> torch.Tensor:
 @configclass
 class TerminationsCfg:
     goal_reached = DoneTerm(func=reached_goal)
-    # collision = DoneTerm(func=collision_from_lidar_stage4)
-    collision = DoneTerm(func=collision_from_lidar)
+    collision = DoneTerm(func=collision_from_lidar_stage4)
     tumble = DoneTerm(func=tumble)
     time_out = DoneTerm(func=time_out, time_out=True)

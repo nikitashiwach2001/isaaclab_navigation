@@ -16,12 +16,12 @@ MAX_ANGULAR_SPEED = 1.5
 ENABLE_BACKWARD = False
 
 THRESHOLD_GOAL = 0.25
-THRESHOLD_COLLISION = 0.22
+THRESHOLD_COLLISION = 0.30
 
-SUCCESS_REWARD = 2500.0
-COLLISION_PENALTY = 2000.0
+SUCCESS_REWARD = 500.0
+COLLISION_PENALTY = 300.0
 
-REWARD_FUNCTION = "B"
+REWARD_FUNCTION = "stage4"
 
 
 def _get_lidar_distances(env: ManagerBasedRLEnv):
@@ -225,7 +225,7 @@ def _get_lidar_temporal_sector_diff_reward(env: ManagerBasedRLEnv) -> torch.Tens
     #     sector_diff,
     # )
     sector_diff = torch.where(
-        torch.abs(sector_diff) < 0.001,
+        torch.abs(sector_diff) < 0.0003,
         torch.zeros_like(sector_diff),
         sector_diff,
     )
@@ -243,6 +243,7 @@ def _ensure_stage3_buffers(env, goal_dist, min_obstacle_dist):
         or env.prev_min_obstacle_dist.shape != min_obstacle_dist.shape
     ):
         env.prev_min_obstacle_dist = min_obstacle_dist.clone()
+
 
 
 def navigation_reward_A_stage3_temporal(env: ManagerBasedRLEnv) -> torch.Tensor:
@@ -274,9 +275,9 @@ def navigation_reward_A_stage3_temporal(env: ManagerBasedRLEnv) -> torch.Tensor:
     # front_closing = front_temporal < -0.007
     # left_closing = left_temporal < -0.007
     # right_closing = right_temporal < -0.007
-    front_closing = front_temporal < -0.0015
-    left_closing = left_temporal < -0.0015
-    right_closing = right_temporal < -0.0015
+    front_closing = front_temporal < -0.0003
+    left_closing = left_temporal < -0.0003
+    right_closing = right_temporal < -0.0003
 
     front_danger = front_min < 0.50
     left_danger = left_min < 0.40
@@ -288,11 +289,9 @@ def navigation_reward_A_stage3_temporal(env: ManagerBasedRLEnv) -> torch.Tensor:
     left_dynamic_risk = left_danger & left_closing
     right_dynamic_risk = right_danger & right_closing
 
-    goal_area_blocked = near_goal & (
-        front_dynamic_risk | left_dynamic_risk | right_dynamic_risk
-    )
-
-    detour_needed = front_blocked | goal_area_blocked
+    # fix: fire anywhere
+    dynamic_blocked = front_dynamic_risk | left_dynamic_risk | right_dynamic_risk
+    detour_needed = front_blocked | dynamic_blocked
 
     r_yaw = torch.where(
         detour_needed,
@@ -364,11 +363,14 @@ def navigation_reward_A_stage3_temporal(env: ManagerBasedRLEnv) -> torch.Tensor:
         torch.zeros_like(goal_dist),
     )
 
-    r_near_goal_rush = torch.where(
-        goal_area_blocked & (action_linear > 0.08),
-        torch.full_like(goal_dist, -1.0),
-        torch.zeros_like(goal_dist),
-    )
+    # goal_area_blocked = near_goal & (front_dynamic_risk | ...)
+
+
+    # r_near_goal_rush = torch.where(
+    #     goal_area_blocked & (action_linear > 0.08),
+    #     torch.full_like(goal_dist, -1.0),
+    #     torch.zeros_like(goal_dist),
+    # )
 
     no_progress = torch.abs(progress) < 0.003
     not_near_goal = goal_dist > 0.40
@@ -376,10 +378,10 @@ def navigation_reward_A_stage3_temporal(env: ManagerBasedRLEnv) -> torch.Tensor:
     low_angular = torch.abs(action_angular) < 0.08
 
     r_stuck = torch.where(
-        no_progress & not_near_goal & low_linear,
-        torch.full_like(goal_dist, -1.0),
-        torch.zeros_like(goal_dist),
+        no_progress & not_near_goal & low_linear & (min_obstacle_dist > 0.55),
+        -1.0, 0.0
     )
+
 
     reward = (
         r_yaw
@@ -387,9 +389,9 @@ def navigation_reward_A_stage3_temporal(env: ManagerBasedRLEnv) -> torch.Tensor:
         + r_obstacle
         + r_vlinear
         + r_vangular
-        # + r_closing_fast
+        + r_closing_fast
         + r_clearance_recovery
-        + r_near_goal_rush
+        # + r_near_goal_rush
         + r_stuck
         - 1.0
     )
@@ -618,16 +620,188 @@ def navigation_reward_B(env: ManagerBasedRLEnv) -> torch.Tensor:
 
     return reward
 
+def navigation_reward_stage4(env: ManagerBasedRLEnv) -> torch.Tensor:
+    """Stage 4 reward: static maze + two moving obstacles, temporal-diff aware."""
+
+    min_obstacle_dist, front_min, right_min, left_min = _get_lidar_distances(env)
+    goal_dist, goal_angle = _get_goal_distance_and_angle(env)
+    action_linear, action_angular = _get_real_actions(env)
+
+    _ensure_stage3_buffers(env, goal_dist, min_obstacle_dist)
+
+    # ── Temporal diff ────────────────────────────────────────────────────────
+    temporal_diff  = _get_lidar_temporal_sector_diff_reward(env)
+    # sector order: 0=front, 1=front-left, 2=left, 3=back-left,
+    #               4=back,  5=back-right, 6=right, 7=front-right
+    front_temporal = temporal_diff[:, 0]
+    left_temporal  = torch.minimum(temporal_diff[:, 1], temporal_diff[:, 2])
+    right_temporal = torch.minimum(temporal_diff[:, 6], temporal_diff[:, 7])
+
+    # ── Closing flags (obstacle moving toward robot in that sector) ───────────
+    CLOSING_THRESH = -0.0003
+    front_closing = front_temporal < CLOSING_THRESH
+    left_closing  = left_temporal  < CLOSING_THRESH
+    right_closing = right_temporal < CLOSING_THRESH
+
+    # ── Distance zones ────────────────────────────────────────────────────────
+    front_blocked = front_min < 0.50
+    side_tight    = (left_min < 0.35) | (right_min < 0.35)
+
+    # dynamic risk: obstacle already close AND closing
+    front_dynamic_risk = (front_min < 0.50) & front_closing
+    left_dynamic_risk  = (left_min  < 0.40) & left_closing
+    right_dynamic_risk = (right_min < 0.40) & right_closing
+
+    # early warning: moderately close AND closing — only used to slow down,
+    # NOT to relax heading (prevents constant detour mode in the small arena)
+    front_early_risk = (front_min < 0.75) & front_closing
+
+    dynamic_blocked = (
+        front_dynamic_risk | left_dynamic_risk | right_dynamic_risk | front_early_risk
+    )
+
+    # tight_space: slow down for static proximity OR any dynamic approach
+    tight_space = front_blocked | side_tight | dynamic_blocked
+
+    # detour_needed: only relax heading when obstacle is genuinely close/dangerous.
+    # Excludes front_early_risk — early warning slows speed but keeps goal heading.
+    detour_needed = front_blocked | front_dynamic_risk | left_dynamic_risk | right_dynamic_risk
+
+    # ── 1. Yaw reward ─────────────────────────────────────────────────────────
+    # Near goal: stronger heading so robot doesn't orbit the goal.
+    near_goal_heading = goal_dist < 0.40
+    corner_trapped    = front_blocked & side_tight   # both front and side walls close
+    r_yaw = torch.where(
+        corner_trapped,
+        -2.00 * torch.abs(goal_angle),   # urgent: face goal to escape corner
+        torch.where(
+            near_goal_heading & ~detour_needed,
+            -2.00 * torch.abs(goal_angle),
+            torch.where(
+                detour_needed,
+                -0.75 * torch.abs(goal_angle),
+                -1.00 * torch.abs(goal_angle),
+            ),
+        ),
+    )
+
+    # ── 2. Angular velocity penalty ───────────────────────────────────────────
+    # When robot is misaligned with goal (needs to turn), reduce angular penalty
+    # so it can make sharp corrections. When well-aligned, penalise spinning.
+    misaligned = torch.abs(goal_angle) > 0.5   # ~30 degrees off
+    r_vangular = torch.where(
+        misaligned,
+        -0.10 * (action_angular ** 2),   # allow sharp turns to re-acquire goal
+        torch.where(
+            detour_needed,
+            -0.50 * (action_angular ** 2),
+            -1.00 * (action_angular ** 2),
+        ),
+    )
+
+    # ── 3. Goal progress ──────────────────────────────────────────────────────
+    progress   = env.goal_dist_prev - goal_dist
+    r_distance = progress * 30.0
+    env.goal_dist_prev[:] = goal_dist
+
+    # ── 4. Obstacle penalty (soft gradient + hard step at termination boundary)
+    # Termination fires at 0.30 m (terminations.py THRESHOLD_COLLISION).
+    # Hard penalty uses the same threshold so it fires on the final step.
+    safe_dist       = 0.65
+    terminal_dist   = 0.30
+    r_obstacle_soft = -6.0 * torch.clamp(
+        (safe_dist - min_obstacle_dist) / (safe_dist - terminal_dist),
+        0.0, 1.0,
+    ) ** 2
+    r_obstacle_hard = torch.where(
+        min_obstacle_dist < terminal_dist,
+        torch.full_like(min_obstacle_dist, -20.0),
+        torch.zeros_like(min_obstacle_dist),
+    )
+    r_obstacle = r_obstacle_soft + r_obstacle_hard
+
+    # ── 5. Linear speed ───────────────────────────────────────────────────────
+    # Open space: full pressure toward max speed.
+    # Tight / dynamic zone: 50% pressure — prevents speed collapse and timeout
+    # while still allowing the robot to slow when needed.
+    # Near goal: no pressure so robot doesn't overshoot.
+    near_goal = goal_dist < 0.40
+    r_vlinear_open = -(((MAX_LINEAR_SPEED - action_linear) * 10.0) ** 2)
+    r_vlinear = torch.where(
+        near_goal,
+        torch.zeros_like(action_linear),
+        torch.where(
+            tight_space,
+            0.50 * r_vlinear_open,
+            r_vlinear_open,
+        ),
+    )
+
+    # ── 6. Penalise rushing into a closing obstacle ───────────────────────────
+    closing_danger = front_dynamic_risk | left_dynamic_risk | right_dynamic_risk
+    r_closing_fast = torch.where(
+        closing_danger & (action_linear > 0.12),
+        torch.full_like(goal_dist, -1.5),
+        torch.zeros_like(goal_dist),
+    )
+
+    # ── 7. Penalise pushing straight into a static front block ────────────────
+    # Only fires at 0.35m (not 0.50m) to avoid constant stop-penalty that
+    # causes speed collapse in the confined 5×5m arena.
+    front_blocked_push = front_min < 0.35
+    r_front_push = torch.where(
+        front_blocked_push & (action_linear > 0.08),
+        torch.full_like(goal_dist, -2.0),
+        torch.zeros_like(goal_dist),
+    )
+
+    # ── 8. Clearance recovery (any obstacle, incl. walls) ────────────────────
+    clearance_delta = min_obstacle_dist - env.prev_min_obstacle_dist
+    env.prev_min_obstacle_dist[:] = min_obstacle_dist
+    r_clearance_recovery = torch.where(
+        min_obstacle_dist < 0.70,
+        torch.clamp(clearance_delta, -0.03, 0.03) * 80.0,
+        torch.zeros_like(goal_dist),
+    )
+
+    # ── 9. Anti-stuck (only in open space; don't penalise yielding) ───────────
+    no_progress  = torch.abs(progress) < 0.003
+    not_near_goal = goal_dist > 0.40
+    r_stuck = torch.where(
+        no_progress & not_near_goal & (action_linear < 0.06) & (min_obstacle_dist > 0.40),
+        torch.full_like(goal_dist, -1.0),
+        torch.zeros_like(goal_dist),
+    )
+
+    # ── Final ─────────────────────────────────────────────────────────────────
+    # Terminal rewards (SUCCESS_REWARD / COLLISION_PENALTY) are applied once
+    # by the training script on done steps — do NOT add them here to avoid
+    # double-counting in the replay buffer.
+    reward = (
+        r_yaw
+        + r_distance
+        + r_obstacle
+        + r_vlinear
+        + r_vangular
+        + r_closing_fast
+        + r_front_push
+        + r_clearance_recovery
+        + r_stuck
+        - 1.0
+    )
+
+    return reward
+
+
 def navigation_reward(env: ManagerBasedRLEnv) -> torch.Tensor:
     """Select reward function."""
 
-    if REWARD_FUNCTION == "A":
-        return navigation_reward_A_stage3_temporal(env)
+    if REWARD_FUNCTION == "stage4":
+        return navigation_reward_stage4(env)
     elif REWARD_FUNCTION == "B":
+        return navigation_reward_A_stage3_temporal(env)
+    elif REWARD_FUNCTION == "A":
         return navigation_reward_B(env)
-    # elif REWARD_FUNCTION == "A1":
-    #     return local_avoidance_reward_A1(env)
-
 
     raise ValueError(f"Unknown REWARD_FUNCTION: {REWARD_FUNCTION}")
 

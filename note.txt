@@ -44,29 +44,26 @@ TERMINATED: 0        (0.00%)
 
 
 
-fintuning cmd:
+fintuning cmd (stage4 v4 — stronger goal signal, continue from v3 2.8M):
 python scripts/train_td3.py \
-  --task Template-Isaaclab-Scene-v0 \
+  --task IsaaclabScene-Stage4-v0 \
   --num_envs 128 \
-  --headless \
-  --total_steps 2000000 \
-  --start_steps 5000 \
-  --batch_size 256 \
-  --buffer_size 1000000 \
+  --total_steps 20000000 \
+  --start_steps 10000 \
+  --batch_size 512 \
+  --buffer_size 2000000 \
   --hidden_dim 256 \
-  --actor_lr 0.00003 \
-  --critic_lr 0.0003 \
+  --actor_lr 0.00005 \
+  --critic_lr 0.0001 \
   --gamma 0.99 \
   --tau 0.005 \
   --policy_noise 0.2 \
   --noise_clip 0.5 \
-  --policy_delay 2 \
-  --expl_noise 0.05 \
-  --save_interval 50000 \
-  --log_interval 1000 \
-  --episode_log_interval 500 \
-  --load_checkpoint logs/td3_stage2a_mixed_goals_from_clean_stage1_v1/20260428_062336/td3_final.pt \
-  --run_name td3_stage2b_hard_goals_from_stage2a_v1
+  --policy_delay 4 \
+  --expl_noise 0.15 \
+  --save_interval 200000 \
+  --load_checkpoint logs/may_7/stage4_v3_stable/20260507_121444/td3_step_2800000.pt \
+  --run_name may_7/stage4_v4_goal_signal
 
 Traning cmd:
 
@@ -111,7 +108,18 @@ TERMINATED: 0        (0.00%)
 ========================================
 
 python scripts/play_td3.py \
-  --task IsaaclabScene-Stage3-v0 \
-  --checkpoint logs/apr_30/td3_stage3_steeper_proximity_v1/20260430_061009/td3_final.pt \
-  --num_envs 4 \
+  --task IsaaclabScene-Stage4-v0 \
+  --checkpoint logs/may_6/stage_4A_from_stage1_static_reward_v1/20260506_113638/td3_step_2850048.pt \
+  --num_envs 4 
 
+
+
+Stage 4 BEST: logs/may_7/stage4_phase3_v6/20260507_150905/td3_step_4400000.pt
+Eval (1000 ep): 71.2% success, 23.9% COLL_DYN, 1.6% COLL_STA
+
+
+Recommended path to 95%:
+
+Finish v7 (current) — target ~78-82%
+Add LSTM to actor: GRUCell(256→256) before the output layer, train from v7 best with --hidden_dim 256 --use_lstm — this is the architecture change needed to break the 85% ceiling
+After LSTM training reaches plateau, add a 3rd moving obstacle and finetune

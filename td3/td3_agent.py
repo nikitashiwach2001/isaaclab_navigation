@@ -89,7 +89,7 @@ class TD3Agent:
 
         self.critic_optimizer.zero_grad()
         critic_loss.backward()
-        nn.utils.clip_grad_norm_(self.critic.parameters(), max_norm=2.0)
+        nn.utils.clip_grad_norm_(self.critic.parameters(), max_norm=1.0)
         self.critic_optimizer.step()
 
         self.last_critic_loss = critic_loss.detach()
@@ -142,3 +142,16 @@ class TD3Agent:
         self.actor_optimizer.load_state_dict(checkpoint["actor_optimizer"])
         self.critic_optimizer.load_state_dict(checkpoint["critic_optimizer"])
         self.total_it = checkpoint["total_it"]
+
+    def load_actor_only(self, path: str):
+        """Load actor weights only; critic stays freshly initialised.
+
+        Use this when the reward scale changes between runs so that the old
+        critic's Q-value estimates don't cause immediate divergence.
+        """
+        checkpoint = torch.load(path, map_location=self.device)
+        self.actor.load_state_dict(checkpoint["actor"])
+        self.actor_target.load_state_dict(checkpoint["actor_target"])
+        self.actor_optimizer.load_state_dict(checkpoint["actor_optimizer"])
+        self.total_it = checkpoint["total_it"]
+        print(f"[TD3] Loaded actor only from {path}. Critic is fresh.")

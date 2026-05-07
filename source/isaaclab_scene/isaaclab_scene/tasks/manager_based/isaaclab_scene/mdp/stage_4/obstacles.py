@@ -1,3 +1,4 @@
+import os
 import torch
 import isaaclab.sim as sim_utils
 from isaaclab.assets import RigidObjectCfg
@@ -39,7 +40,7 @@ STAGE4_OBSTACLE_2_CFG = RigidObjectCfg(
 #
 # Speed curriculum: scale all keyframe times by this factor.
 # 1.0 = full speed, 3.0 = 3× slower (good starting point), ramp down toward 1.0.
-OBSTACLE_SPEED_SCALE = 1.0
+OBSTACLE_SPEED_SCALE = float(os.environ.get("OBSTACLE_SPEED_SCALE", "1.0"))
 
 # Obstacle 1 — pendulum, 140 s loop, stays mostly in upper half (y ≈ 1.0)
 _OBS1_TIMES_BASE = [0.0, 10.0, 50.0, 70.0, 90.0, 130.0, 140.0]

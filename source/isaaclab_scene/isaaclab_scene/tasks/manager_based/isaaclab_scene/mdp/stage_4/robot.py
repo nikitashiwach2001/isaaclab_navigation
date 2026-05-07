@@ -52,12 +52,12 @@ LIDAR_CFG_4 = MultiMeshRayCasterCfg(
             track_mesh_transforms=False
         ),
 
-        # MultiMeshRayCasterCfg.RaycastTargetCfg(
-        #     prim_expr="{ENV_REGEX_NS}/InnerWall_.*",
-        #     is_shared=True,
-        #     merge_prim_meshes=True,
-        #     track_mesh_transforms=False
-        # ),
+        MultiMeshRayCasterCfg.RaycastTargetCfg(
+            prim_expr="{ENV_REGEX_NS}/InnerWall_.*",
+            is_shared=True,
+            merge_prim_meshes=True,
+            track_mesh_transforms=False
+        ),
 
         # MultiMeshRayCasterCfg.RaycastTargetCfg(
         #     prim_expr="{ENV_REGEX_NS}/Obstacle_.*",
@@ -68,7 +68,7 @@ LIDAR_CFG_4 = MultiMeshRayCasterCfg(
         # Static obstacles: Obstacle_1, Obstacle_2, Obstacle_4...
         # Excludes Obstacle_3
         # MultiMeshRayCasterCfg.RaycastTargetCfg(
-        #     prim_expr="{ENV_REGEX_NS}/Obstacle_(?!3$).*",
+        #     prim_expr="{ENV_REGEX_NS}/Obstacle_3",
         #     track_mesh_transforms=False,
         #     merge_prim_meshes=True,
         # ),
