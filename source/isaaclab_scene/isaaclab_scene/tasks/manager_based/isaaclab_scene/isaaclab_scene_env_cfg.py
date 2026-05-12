@@ -60,7 +60,7 @@ class BaseSceneCfg(InteractiveSceneCfg):
     )
 
     wall_2 = RigidObjectCfg(
-        prim_path="{ENV_REGEX_NS}/Wall_2",
+        prim_path="{ENV_REGEX_NS}/wall_2",
         spawn=sim_utils.CuboidCfg(
             size=(5.0, 0.15, 0.5),
             rigid_props=sim_utils.RigidBodyPropertiesCfg(kinematic_enabled=True),
@@ -75,7 +75,7 @@ class BaseSceneCfg(InteractiveSceneCfg):
     )
 
     wall_3 = RigidObjectCfg(
-        prim_path="{ENV_REGEX_NS}/Wall_3",
+        prim_path="{ENV_REGEX_NS}/wall_3",
         spawn=sim_utils.CuboidCfg(
             size=(5.0, 0.15, 0.5),
             rigid_props=sim_utils.RigidBodyPropertiesCfg(kinematic_enabled=True),
@@ -90,7 +90,7 @@ class BaseSceneCfg(InteractiveSceneCfg):
     )
 
     wall_4 = RigidObjectCfg(
-        prim_path="{ENV_REGEX_NS}/Wall_4",
+        prim_path="{ENV_REGEX_NS}/wall_4",
         spawn=sim_utils.CuboidCfg(
             size=(5.0, 0.15, 0.5),
             rigid_props=sim_utils.RigidBodyPropertiesCfg(kinematic_enabled=True),

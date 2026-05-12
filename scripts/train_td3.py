@@ -41,6 +41,7 @@ parser.add_argument("--save_interval", type=int, default=25_000)
 parser.add_argument("--run_name", type=str, default="td3_turtlebot_nav")
 parser.add_argument("--load_checkpoint", type=str, default=None, help="Path to TD3 checkpoint to load for finetuning.")
 parser.add_argument("--reset_critic", action="store_true", default=False, help="Load actor weights only; re-init critic fresh. Use when reward scale changes between runs.")
+parser.add_argument("--use_gru", action="store_true", default=False, help="Use GRU actor for temporal memory.")
 
 AppLauncher.add_app_launcher_args(parser)
 args_cli = parser.parse_args()
@@ -71,13 +72,27 @@ from td3.td3_agent import TD3Agent
 from td3.noise import OUNoise
 
 
+class TrainingLogger:
+    """Mirrors every call to both stdout and a persistent log file."""
+
+    def __init__(self, log_path: str):
+        self._f = open(log_path, "w", buffering=1)
+
+    def __call__(self, msg: str = ""):
+        print(msg)
+        self._f.write(msg + "\n")
+
+    def close(self):
+        self._f.close()
+
+
 # -------------------------
 # Terminal reward constants
 # -------------------------
 SUCCESS_REWARD    =  300.0
 COLLISION_PENALTY =  200.0
 TUMBLE_PENALTY    =  200.0
-TIMEOUT_PENALTY   =  10.0
+TIMEOUT_PENALTY   =  100.0
 
 
 def get_env_buffer(env, name: str, num_envs: int, device) -> torch.Tensor:
@@ -110,34 +125,35 @@ def print_checkpoint_summary(
     last_losses,
     replay_buffer,
     window_start_time,
+    logger,
 ):
     window_total = sum(window_counts.values())
     elapsed = max(time.time() - window_start_time, 1e-6)
     fps = window_env_steps / elapsed
 
-    print(f"\n========== CHECKPOINT SUMMARY | step {global_step} ==========")
-    print(f"Checkpoint: {ckpt_path}")
-    print(f"Replay buffer: {len(replay_buffer)}")
-    print(f"Window env steps: {window_env_steps}")
-    print(f"Training FPS: {fps:.1f}")
+    logger(f"\n========== CHECKPOINT SUMMARY | step {global_step} ==========")
+    logger(f"Checkpoint: {ckpt_path}")
+    logger(f"Replay buffer: {len(replay_buffer)}")
+    logger(f"Window env steps: {window_env_steps}")
+    logger(f"Training FPS: {fps:.1f}")
 
     if window_env_steps > 0:
-        print(f"Mean reward / env-step: {window_reward_step_sum / window_env_steps:.4f}")
-        print(f"Mean done / env-step: {window_done_sum / window_env_steps:.4f}")
-        print(f"Mean action linear: {window_action_linear_sum / window_env_steps:.4f}")
-        print(f"Mean |action angular|: {window_action_angular_abs_sum / window_env_steps:.4f}")
+        logger(f"Mean reward / env-step: {window_reward_step_sum / window_env_steps:.4f}")
+        logger(f"Mean done / env-step: {window_done_sum / window_env_steps:.4f}")
+        logger(f"Mean action linear: {window_action_linear_sum / window_env_steps:.4f}")
+        logger(f"Mean |action angular|: {window_action_angular_abs_sum / window_env_steps:.4f}")
 
-    print(f"Critic loss: {last_losses.get('critic_loss', 0.0):.6f}")
-    print(f"Actor loss:  {last_losses.get('actor_loss', 0.0):.6f}")
+    logger(f"Critic loss: {last_losses.get('critic_loss', 0.0):.6f}")
+    logger(f"Actor loss:  {last_losses.get('actor_loss', 0.0):.6f}")
 
     if window_total > 0:
         avg_reward = window_reward_sum / window_total
         avg_steps = window_step_sum / window_total
 
-        print("-" * 58)
-        print(f"Episodes in window: {window_total}  ({window_start_episode + 1} - {episode_count})")
-        print(f"Avg episode reward: {avg_reward:.2f}")
-        print(f"Avg episode steps:  {avg_steps:.1f}")
+        logger("-" * 58)
+        logger(f"Episodes in window: {window_total}  ({window_start_episode + 1} - {episode_count})")
+        logger(f"Avg episode reward: {avg_reward:.2f}")
+        logger(f"Avg episode steps:  {avg_steps:.1f}")
 
         total_coll = (
             window_counts['coll_dynamic'] + window_counts['coll_static']
@@ -149,23 +165,23 @@ def print_checkpoint_summary(
             or window_counts['coll_boundary'] > 0
         )
 
-        print(f"SUCCESS:       {window_counts['success']:<8} ({pct(window_counts['success'], window_total):.2f}%)")
+        logger(f"SUCCESS:       {window_counts['success']:<8} ({pct(window_counts['success'], window_total):.2f}%)")
         if has_coll_subtypes:
-            print(f"COLL_DYNAMIC:  {window_counts['coll_dynamic']:<8} ({pct(window_counts['coll_dynamic'], window_total):.2f}%)")
-            print(f"COLL_STATIC:   {window_counts['coll_static']:<8} ({pct(window_counts['coll_static'], window_total):.2f}%)")
-            print(f"COLL_BOUNDARY: {window_counts['coll_boundary']:<8} ({pct(window_counts['coll_boundary'], window_total):.2f}%)")
+            logger(f"COLL_DYNAMIC:  {window_counts['coll_dynamic']:<8} ({pct(window_counts['coll_dynamic'], window_total):.2f}%)")
+            logger(f"COLL_STATIC:   {window_counts['coll_static']:<8} ({pct(window_counts['coll_static'], window_total):.2f}%)")
+            logger(f"COLL_BOUNDARY: {window_counts['coll_boundary']:<8} ({pct(window_counts['coll_boundary'], window_total):.2f}%)")
             if window_counts['coll_unknown'] > 0:
-                print(f"COLL_UNKNOWN:  {window_counts['coll_unknown']:<8} ({pct(window_counts['coll_unknown'], window_total):.2f}%)")
+                logger(f"COLL_UNKNOWN:  {window_counts['coll_unknown']:<8} ({pct(window_counts['coll_unknown'], window_total):.2f}%)")
         else:
-            print(f"COLLISION:     {total_coll:<8} ({pct(total_coll, window_total):.2f}%)")
-        print(f"TIMEOUT:       {window_counts['timeout']:<8} ({pct(window_counts['timeout'], window_total):.2f}%)")
-        print(f"TUMBLE:        {window_counts['tumble']:<8} ({pct(window_counts['tumble'], window_total):.2f}%)")
-        print(f"TERMINATED:    {window_counts['terminated']:<8} ({pct(window_counts['terminated'], window_total):.2f}%)")
+            logger(f"COLLISION:     {total_coll:<8} ({pct(total_coll, window_total):.2f}%)")
+        logger(f"TIMEOUT:       {window_counts['timeout']:<8} ({pct(window_counts['timeout'], window_total):.2f}%)")
+        logger(f"TUMBLE:        {window_counts['tumble']:<8} ({pct(window_counts['tumble'], window_total):.2f}%)")
+        logger(f"TERMINATED:    {window_counts['terminated']:<8} ({pct(window_counts['terminated'], window_total):.2f}%)")
     else:
-        print("-" * 58)
-        print("No completed episodes in this checkpoint window.")
+        logger("-" * 58)
+        logger("No completed episodes in this checkpoint window.")
 
-    print("=" * 58 + "\n")
+    logger("=" * 58 + "\n")
 
 
 def main():
@@ -187,9 +203,6 @@ def main():
         dtype=np.float32,
     )
 
-    print(f"[INFO] Observation space: {env.observation_space}")
-    print(f"[INFO] Action space: {env.action_space}")
-
     obs, _ = env.reset()
     state = obs["policy"]
 
@@ -197,9 +210,22 @@ def main():
     state_dim = state.shape[1]
     action_dim = env.action_space.shape[1]
 
-    print(f"[INFO] num_envs: {num_envs}")
-    print(f"[INFO] state_dim: {state_dim}")
-    print(f"[INFO] action_dim: {action_dim}")
+    timestamp = time.strftime("%Y%m%d_%H%M%S")
+    save_dir = os.path.join("logs", args_cli.run_name, timestamp)
+    os.makedirs(save_dir, exist_ok=True)
+
+    logger = TrainingLogger(os.path.join(save_dir, "training.log"))
+
+    logger(f"[INFO] Saving checkpoints to: {save_dir}")
+    logger(f"[INFO] Run name:     {args_cli.run_name}")
+    logger(f"[INFO] Checkpoint:   {args_cli.load_checkpoint}")
+    logger(f"[INFO] reset_critic: {args_cli.reset_critic}")
+    logger(f"[INFO] Obs space:    {env.observation_space}")
+    logger(f"[INFO] Action space: {env.action_space}")
+    logger(f"[INFO] num_envs:     {num_envs}  state_dim: {state_dim}  action_dim: {action_dim}")
+    logger(f"[INFO] actor_lr:     {args_cli.actor_lr}  critic_lr: {args_cli.critic_lr}")
+    logger(f"[INFO] policy_delay: {args_cli.policy_delay}  tau: {args_cli.tau}  expl_noise: {args_cli.expl_noise}")
+    logger(f"[INFO] batch_size:   {args_cli.batch_size}  buffer_size: {args_cli.buffer_size}  total_steps: {args_cli.total_steps}")
 
     agent = TD3Agent(
         state_dim=state_dim,
@@ -213,15 +239,24 @@ def main():
         policy_noise=args_cli.policy_noise,
         noise_clip=args_cli.noise_clip,
         policy_delay=args_cli.policy_delay,
+        use_gru=args_cli.use_gru,
     )
 
     if args_cli.load_checkpoint is not None:
         if args_cli.reset_critic:
             agent.load_actor_only(args_cli.load_checkpoint)
-            print(f"[INFO] Loaded ACTOR ONLY from: {args_cli.load_checkpoint} (critic is fresh)")
+            logger(f"[INFO] Loaded ACTOR ONLY from: {args_cli.load_checkpoint} (critic is fresh)")
         else:
             agent.load(args_cli.load_checkpoint)
-            print(f"[INFO] Loaded full checkpoint: {args_cli.load_checkpoint}")
+            logger(f"[INFO] Loaded full checkpoint: {args_cli.load_checkpoint}")
+
+        # load_state_dict restores the saved lr, overriding what was passed to TD3Agent.
+        # Force the CLI-specified LRs to take effect after loading.
+        for pg in agent.actor_optimizer.param_groups:
+            pg['lr'] = args_cli.actor_lr
+        for pg in agent.critic_optimizer.param_groups:
+            pg['lr'] = args_cli.critic_lr
+        logger(f"[INFO] LR override after load — actor_lr: {args_cli.actor_lr}  critic_lr: {args_cli.critic_lr}")
 
     replay_buffer = ReplayBuffer(
         state_dim=state_dim,
@@ -236,12 +271,6 @@ def main():
         device=device,
         sigma=args_cli.expl_noise,
     )
-
-    timestamp = time.strftime("%Y%m%d_%H%M%S")
-    save_dir = os.path.join("logs", args_cli.run_name, timestamp)
-    os.makedirs(save_dir, exist_ok=True)
-
-    print(f"[INFO] Saving checkpoints to: {save_dir}")
 
     global_step = 0
     episode_count = 0
@@ -334,6 +363,7 @@ def main():
         if done.any():
             done_env_ids = torch.where(done)[0]
             ou_noise.reset(done_env_ids)
+            agent.reset_hidden(done_env_ids)
 
             goal_reached_buf = get_env_buffer(env, "goal_reached_buf", num_envs, device)
             collision_buf = get_env_buffer(env, "collision_buf", num_envs, device)
@@ -408,6 +438,7 @@ def main():
                 last_losses=last_losses,
                 replay_buffer=replay_buffer,
                 window_start_time=window_start_time,
+                logger=logger,
             )
 
             window_counts = {k: 0 for k in total_counts}
@@ -434,26 +465,27 @@ def main():
         or total_counts['coll_boundary'] > 0
     )
 
-    print("\n========== TRAINING SUMMARY ==========")
-    print(f"Total episodes: {episode_count}")
-    print(f"SUCCESS:       {total_counts['success']:<8} ({pct(total_counts['success'], total_finished):.2f}%)")
+    logger("\n========== TRAINING SUMMARY ==========")
+    logger(f"Total episodes: {episode_count}")
+    logger(f"SUCCESS:       {total_counts['success']:<8} ({pct(total_counts['success'], total_finished):.2f}%)")
     if has_coll_subtypes_final:
-        print(f"COLL_DYNAMIC:  {total_counts['coll_dynamic']:<8} ({pct(total_counts['coll_dynamic'], total_finished):.2f}%)")
-        print(f"COLL_STATIC:   {total_counts['coll_static']:<8} ({pct(total_counts['coll_static'], total_finished):.2f}%)")
-        print(f"COLL_BOUNDARY: {total_counts['coll_boundary']:<8} ({pct(total_counts['coll_boundary'], total_finished):.2f}%)")
+        logger(f"COLL_DYNAMIC:  {total_counts['coll_dynamic']:<8} ({pct(total_counts['coll_dynamic'], total_finished):.2f}%)")
+        logger(f"COLL_STATIC:   {total_counts['coll_static']:<8} ({pct(total_counts['coll_static'], total_finished):.2f}%)")
+        logger(f"COLL_BOUNDARY: {total_counts['coll_boundary']:<8} ({pct(total_counts['coll_boundary'], total_finished):.2f}%)")
         if total_counts['coll_unknown'] > 0:
-            print(f"COLL_UNKNOWN:  {total_counts['coll_unknown']:<8} ({pct(total_counts['coll_unknown'], total_finished):.2f}%)")
+            logger(f"COLL_UNKNOWN:  {total_counts['coll_unknown']:<8} ({pct(total_counts['coll_unknown'], total_finished):.2f}%)")
     else:
-        print(f"COLLISION:     {total_coll_final:<8} ({pct(total_coll_final, total_finished):.2f}%)")
-    print(f"TIMEOUT:       {total_counts['timeout']:<8} ({pct(total_counts['timeout'], total_finished):.2f}%)")
-    print(f"TUMBLE:        {total_counts['tumble']:<8} ({pct(total_counts['tumble'], total_finished):.2f}%)")
-    print(f"TERMINATED:    {total_counts['terminated']:<8} ({pct(total_counts['terminated'], total_finished):.2f}%)")
-    print("======================================\n")
+        logger(f"COLLISION:     {total_coll_final:<8} ({pct(total_coll_final, total_finished):.2f}%)")
+    logger(f"TIMEOUT:       {total_counts['timeout']:<8} ({pct(total_counts['timeout'], total_finished):.2f}%)")
+    logger(f"TUMBLE:        {total_counts['tumble']:<8} ({pct(total_counts['tumble'], total_finished):.2f}%)")
+    logger(f"TERMINATED:    {total_counts['terminated']:<8} ({pct(total_counts['terminated'], total_finished):.2f}%)")
+    logger("======================================\n")
 
     final_path = os.path.join(save_dir, "td3_final.pt")
     agent.save(final_path)
-    print(f"[INFO] Saved final checkpoint: {final_path}")
+    logger(f"[INFO] Saved final checkpoint: {final_path}")
 
+    logger.close()
     env.close()
 
 

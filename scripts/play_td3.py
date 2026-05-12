@@ -21,6 +21,7 @@ parser.add_argument("--checkpoint", type=str, required=True)
 parser.add_argument("--disable_fabric", action="store_true", default=False)
 parser.add_argument("--hidden_dim", type=int, default=256)
 parser.add_argument("--eval_episodes", type=int, default=100)
+parser.add_argument("--use_gru", action="store_true", default=False, help="Use GRU actor.")
 
 # Isaac Lab launcher args
 AppLauncher.add_app_launcher_args(parser)
@@ -108,14 +109,15 @@ def main():
     state_dim = state.shape[1]
     action_dim = env.action_space.shape[1]
 
-    # Observation layout (103 dims):
-    #   0  – 89  : LiDAR scan          (90)
-    #   90 – 97  : temporal sector diff (8)
-    #   98       : goal distance        (1)
-    #   99       : goal angle           (1)
-    #   100– 101 : previous actions     (2)
-    GOAL_DIST_IDX  = 98
-    GOAL_ANGLE_IDX = 99
+    # Observation layout (284 dims):
+    #   0  – 269 : lidar_stacked (90×3)       (270)
+    #   270– 277 : lidar_temporal_sector_diff  (8)
+    #   278      : goal distance               (1)
+    #   279      : goal angle                  (1)
+    #   280– 281 : robot_velocity              (2)
+    #   282– 283 : previous actions            (2)
+    GOAL_DIST_IDX  = 270 + 8          # 278
+    GOAL_ANGLE_IDX = 270 + 8 + 1      # 279
     MAX_GOAL_DIST  = 7.07106781187   # sqrt(5² + 5²)
 
     # -------------------------
@@ -126,6 +128,7 @@ def main():
         action_dim=action_dim,
         device=device,
         hidden_dim=args_cli.hidden_dim,
+        use_gru=args_cli.use_gru,
     )
 
     agent.load(args_cli.checkpoint)
@@ -175,6 +178,7 @@ def main():
 
             if done.any():
                 done_env_ids = torch.where(done)[0]
+                agent.reset_hidden(done_env_ids)
 
                 goal_reached_buf       = get_env_buffer(env, "goal_reached_buf",       num_envs, device)
                 collision_buf          = get_env_buffer(env, "collision_buf",           num_envs, device)

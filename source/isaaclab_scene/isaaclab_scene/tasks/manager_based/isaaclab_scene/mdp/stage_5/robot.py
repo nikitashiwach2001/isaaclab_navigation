@@ -1,5 +1,3 @@
-# mdp/robot.py
-
 import isaaclab.sim as sim_utils
 from isaaclab.assets import ArticulationCfg
 from isaaclab.actuators import ImplicitActuatorCfg
@@ -11,13 +9,11 @@ TURTLEBOT3_BURGER_CFG = ArticulationCfg(
         usd_path="/home/user/Documents/isaaclab_scene/assets/robots/turtlebot3_burger.usd",
         activate_contact_sensors=True,
         articulation_props=sim_utils.ArticulationRootPropertiesCfg(
-        enabled_self_collisions=False,
-        fix_root_link=False,
+            enabled_self_collisions=False,
+            fix_root_link=False,
         ),
     ),
-    init_state=ArticulationCfg.InitialStateCfg(
-        pos=(0.0, 0.0, 0.0),  # arena origin
-    ),
+    init_state=ArticulationCfg.InitialStateCfg(pos=(0.0, 0.0, 0.0)),
     actuators={
         "wheels": ImplicitActuatorCfg(
             joint_names_expr=["wheel_left_joint", "wheel_right_joint"],
@@ -28,61 +24,39 @@ TURTLEBOT3_BURGER_CFG = ArticulationCfg(
     },
 )
 
-LIDAR_CFG_4 = MultiMeshRayCasterCfg(
+LIDAR_CFG_5 = MultiMeshRayCasterCfg(
     prim_path="{ENV_REGEX_NS}/Robot/base_link",
     offset=MultiMeshRayCasterCfg.OffsetCfg(pos=(0.0, 0.0, 0.2)),
-    # attach_yaw_only=True,
     ray_alignment="yaw",
     pattern_cfg=patterns.LidarPatternCfg(
         channels=1,
         vertical_fov_range=(0.0, 0.0),
         horizontal_fov_range=(0.0, 360.0),
-        # horizontal_res=8.9,  # 360 / 40 rays = 8.9 deg resolution
-        horizontal_res=3.96,  # 360 / 90 rays = 4 deg resolution
+        horizontal_res=3.96,  # 90 rays
     ),
     max_distance=3.5,
     debug_vis=False,
     mesh_prim_paths=[
-
-        # static walls
+        # static outer walls
         MultiMeshRayCasterCfg.RaycastTargetCfg(
-            prim_expr="{ENV_REGEX_NS}/wall_.*",
+            prim_expr="{ENV_REGEX_NS}/wall.*",
             is_shared=True,
             merge_prim_meshes=True,
-            track_mesh_transforms=False
+            track_mesh_transforms=False,
         ),
-
+        # inner maze walls
         MultiMeshRayCasterCfg.RaycastTargetCfg(
             prim_expr="{ENV_REGEX_NS}/InnerWall_.*",
             is_shared=True,
             merge_prim_meshes=True,
-            track_mesh_transforms=False
+            track_mesh_transforms=False,
         ),
-
-        # MultiMeshRayCasterCfg.RaycastTargetCfg(
-        #     prim_expr="{ENV_REGEX_NS}/Obstacle_.*",
-        #     track_mesh_transforms=False,
-        #     merge_prim_meshes=True,
-        # ),
-
-        # Static obstacles: Obstacle_1, Obstacle_2, Obstacle_4...
-        # Excludes Obstacle_3
-        # MultiMeshRayCasterCfg.RaycastTargetCfg(
-        #     prim_expr="{ENV_REGEX_NS}/Obstacle_3",
-        #     track_mesh_transforms=False,
-        #     merge_prim_meshes=True,
-        # ),
-
-        # Moving obstacles: each cylinder tracked independently.
-        # merge_prim_meshes=False is required — two objects moving in different
-        # directions cannot share a single rigid transform. With merge=True the
-        # combined mesh is baked at the initial position and never updates,
-        # making both obstacles invisible to the LiDAR.
-        # MultiMeshRayCasterCfg.RaycastTargetCfg(
-        #     prim_expr="{ENV_REGEX_NS}/Obstacle_*",
-        #     track_mesh_transforms=True,
-        #     merge_prim_meshes=False,
-        # ),
+        # three moving obstacles — each tracked independently (merge=False required)
+        MultiMeshRayCasterCfg.RaycastTargetCfg(
+            prim_expr="{ENV_REGEX_NS}/Obstacle_*",
+            track_mesh_transforms=True,
+            merge_prim_meshes=False,
+        ),
     ],
 )
 
@@ -92,6 +66,3 @@ CONTACT_SENSOR_CFG = ContactSensorCfg(
     history_length=2,
     track_air_time=False,
 )
-
-
-

@@ -12,7 +12,7 @@ LIDAR_DISTANCE_CAP = 3.5
 # Tune these later after testing
 THRESHOLD_GOAL = 0.25
 THRESHOLD_COLLISION = 0.30
-TUMBLE_THRESHOLD = 0.06
+TUMBLE_THRESHOLD = 0.20
 RESET_GRACE_STEPS = 30
 
 
@@ -112,7 +112,7 @@ def collision_from_lidar_stage4(env: ManagerBasedRLEnv) -> torch.Tensor:
     static_dist = torch.full((env.num_envs,), 999.0, device=env.device)
     boundary_dist = torch.full((env.num_envs,), 999.0, device=env.device)
 
-    for name in ["obstacle_1", "obstacle_2"]:
+    for name in ["obstacle_1", "obstacle_2", "obstacle_3"]:
         if name in env.scene.keys():
             obs_xy = env.scene[name].data.root_pos_w[:, :2]
             dist = torch.norm(robot_xy - obs_xy, dim=-1)

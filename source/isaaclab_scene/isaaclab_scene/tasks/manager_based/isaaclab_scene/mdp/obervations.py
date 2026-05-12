@@ -72,24 +72,71 @@ def lidar_scan(env: ManagerBasedRLEnv) -> torch.Tensor:
     return _compute_lidar_scan(env)
 
 
+N_LIDAR_HISTORY = 3  # frames stacked: t, t-1, t-2
+
+
+def lidar_stacked(env: ManagerBasedRLEnv) -> torch.Tensor:
+    """
+    Stacked LiDAR frames [t, t-1, t-2] concatenated along the ray axis.
+
+    Shape: [num_envs, 90 * N_LIDAR_HISTORY]  →  [num_envs, 270]
+
+    Why this beats temporal_sector_diff alone:
+      - Cross-path obstacles (moving left-to-right) keep near-constant range →
+        temporal diff ≈ 0 even though collision is imminent.
+      - With two past frames the network sees the obstacle shift across rays
+        and can infer its trajectory and speed directly.
+      - Stacking also gives obstacle acceleration (d²range/dt²) free of charge.
+
+    Stage 1 (no moving obstacles): all three frames are identical (walls static).
+    The network learns "identical frames → static env". When frames differ in
+    Stage 4, it knows a dynamic obstacle is present.
+    """
+    current = _compute_lidar_scan(env)  # [num_envs, 90]
+
+    if (
+        not hasattr(env, "lidar_stack")
+        or env.lidar_stack.shape[0] != env.num_envs
+    ):
+        env.lidar_stack = current.unsqueeze(1).repeat(1, N_LIDAR_HISTORY, 1).clone()
+        return env.lidar_stack.reshape(env.num_envs, -1)
+
+    # Reset history for newly-reset envs so past-episode frames don't leak in
+    if hasattr(env, "episode_length_buf"):
+        reset_mask = env.episode_length_buf <= 1
+        if reset_mask.any():
+            env.lidar_stack = env.lidar_stack.clone()
+            env.lidar_stack[reset_mask] = (
+                current[reset_mask].unsqueeze(1).repeat(1, N_LIDAR_HISTORY, 1)
+            )
+
+    # Shift: drop oldest frame, prepend current  →  [t, t-1, t-2]
+    env.lidar_stack = torch.cat(
+        [current.unsqueeze(1), env.lidar_stack[:, :-1, :]], dim=1
+    ).clone()
+
+    return env.lidar_stack.reshape(env.num_envs, -1)
+
+
 def lidar_temporal_sector_diff(env: ManagerBasedRLEnv) -> torch.Tensor:
     """
-    Sector-based temporal difference of lidar.
+    Sector-based obstacle approach velocity from LiDAR temporal difference.
 
-    Uses 8 sectors:
-        front, front-left, left, back-left,
+    Uses 8 sectors (45° each): front, front-left, left, back-left,
         back, back-right, right, front-right
 
-    Shape:
-        [num_envs, 8]
+    Shape: [num_envs, 8], range [-1, 1]
 
-    Meaning:
-        Negative value = obstacle/free-space distance reduced in that sector.
-        Positive value = obstacle moved away / free space increased.
-        Near zero = no major change.
+    Interpretation:
+        -1.0 = obstacle approaching at >= 0.15 m/s in that sector
+        +1.0 = obstacle receding at >= 0.15 m/s
+         0.0 = no motion
+
+    Scales the raw normalized diff to velocity units so the actor gets a
+    signal proportional to actual obstacle speed rather than near-zero raw diffs
+    (~0.00064/step at max obstacle speed vs ±0.05 clamp = 1.3% of range).
+    EMA (alpha=0.8) smooths rotation noise without losing the motion signal.
     """
-
-    
     enable_temporal = getattr(env.cfg, "enable_lidar_temporal_diff", True)
 
     if not enable_temporal:
@@ -97,60 +144,56 @@ def lidar_temporal_sector_diff(env: ManagerBasedRLEnv) -> torch.Tensor:
             print("[DEBUG] temporal lidar disabled: returning zeros")
             env.debug_temporal_disabled_printed = True
         return torch.zeros((env.num_envs, 8), device=env.device)
-    
-    current_lidar = _compute_lidar_scan(env)
+
+    current_lidar = _compute_lidar_scan(env)  # [num_envs, 90], normalized by 3.5m
 
     if (
         not hasattr(env, "prev_lidar_scan")
         or env.prev_lidar_scan.shape != current_lidar.shape
     ):
         env.prev_lidar_scan = current_lidar.clone()
+        env.temporal_diff_ema = torch.zeros((env.num_envs, 8), device=env.device)
         return torch.zeros((env.num_envs, 8), device=env.device)
 
-    prev_lidar = env.prev_lidar_scan
+    # Raw diff in normalized units (negative = obstacle getting closer)
+    diff = current_lidar - env.prev_lidar_scan
 
-    diff = current_lidar - prev_lidar
-    diff = torch.clamp(diff, -1.0, 1.0)
-
-    # Reset temporal diff for newly reset environments
+    # Reset diff for newly reset environments
     if hasattr(env, "episode_length_buf"):
         reset_mask = env.episode_length_buf <= 1
         if reset_mask.any():
+            diff = diff.clone()
             diff[reset_mask] = 0.0
 
-
-    # For 90 rays and 360 degrees:
-    # 90 rays / 8 sectors = 11.25 rays per sector.
-    # torch.tensor_split handles uneven split safely.
+    # Min per 45° sector (most-approaching ray in each sector)
     sectors = torch.tensor_split(diff, 8, dim=1)
-
-    sector_features = []
-
-    for sector in sectors:
-        # Use min change per sector
-        sector_min = torch.min(sector, dim=1, keepdim=True).values
-        sector_features.append(sector_min)
-
-    sector_diff = torch.cat(sector_features, dim=1)
-
-    # Deadband: 0.001 passes obstacle motion (~0.0015/step); clamp large spikes from robot rotation
-    sector_diff = torch.where(
-        torch.abs(sector_diff) < 0.0003,
-        torch.zeros_like(sector_diff),
-        sector_diff,
+    raw_sector_diff = torch.cat(
+        [s.min(dim=1, keepdim=True).values for s in sectors], dim=1
     )
-    sector_diff = torch.clamp(sector_diff, -0.05, 0.05)
+
+    # Scale so the full ±0.05 output range is utilized.
+    # Old raw diff at max obstacle speed (0.15 m/s, dt=0.015s): 0.00064 = 1.3% of ±0.05.
+    # Slow obstacles (0.075 m/s) produced 0.00032 — below the old deadband, zeroed entirely.
+    # New scale: multiply by (0.05 / max_expected_diff) so max obstacle speed → ±0.05.
+    # max_expected_diff = 0.15 * 0.015 / 3.5 = 0.000643 → scale = 0.05 / 0.000643 ≈ 77.8
+    _SCALE = 77.8
+    scaled = raw_sector_diff * _SCALE
+
+    # EMA (alpha=0.8) to suppress robot-rotation noise while preserving motion signal
+    if not hasattr(env, "temporal_diff_ema"):
+        env.temporal_diff_ema = torch.zeros((env.num_envs, 8), device=env.device)
+
+    if hasattr(env, "episode_length_buf"):
+        reset_mask = env.episode_length_buf <= 1
+        if reset_mask.any():
+            env.temporal_diff_ema = env.temporal_diff_ema.clone()
+            env.temporal_diff_ema[reset_mask] = 0.0
+
+    env.temporal_diff_ema = 0.8 * env.temporal_diff_ema + 0.2 * scaled
 
     env.prev_lidar_scan = current_lidar.clone()
 
-    # if not hasattr(env, "_temporal_debug_step"):
-    #     env._temporal_debug_step = 0
-    # env._temporal_debug_step += 1
-    # if env._temporal_debug_step % 500 == 0:
-    #     nonzero_frac = (sector_diff.abs() > 0).float().mean().item()
-        # print(f"[temporal] non-zero fraction: {nonzero_frac:.3f}, max: {sector_diff.abs().max().item():.5f}")
-
-    return sector_diff
+    return torch.clamp(env.temporal_diff_ema / 0.05, -1.0, 1.0)
 
 
 def goal_distance(env: ManagerBasedRLEnv) -> torch.Tensor:
@@ -216,16 +259,39 @@ def previous_actions(env: ManagerBasedRLEnv) -> torch.Tensor:
     return action
 
 
+_MAX_LIN_VEL = 0.22   # matches actions.py
+_MAX_ANG_VEL = 2.0    # matches actions.py
+
+def robot_velocity(env: ManagerBasedRLEnv) -> torch.Tensor:
+    """Actual body-frame forward speed and yaw rate, normalised to [-1, 1].
+
+    Shape: [num_envs, 2]
+    Dim 0: forward velocity  / MAX_LINEAR_SPEED
+    Dim 1: yaw rate          / MAX_ANGULAR_SPEED
+
+    Lets the LSTM correlate commanded actions with true motion — useful when
+    wheels slip or the actuator doesn't respond instantly.
+    """
+    robot = env.scene["robot"]
+    lin = robot.data.root_lin_vel_b[:, 0:1]   # forward (body x)
+    ang = robot.data.root_ang_vel_b[:, 2:3]   # yaw rate (body z)
+    lin_norm = torch.clamp(lin / _MAX_LIN_VEL, -1.0, 1.0)
+    ang_norm = torch.clamp(ang / _MAX_ANG_VEL, -1.0, 1.0)
+    return torch.cat([lin_norm, ang_norm], dim=-1)
+
+
 @configclass
 class ObservationsCfg:
 
     @configclass
     class PolicyCfg(ObsGroup):
-        lidar_scan = ObsTerm(func=lidar_scan)
-        lidar_temporal_sector_diff = ObsTerm(func=lidar_temporal_sector_diff)
-        goal_distance = ObsTerm(func=goal_distance)
-        goal_angle = ObsTerm(func=goal_angle)
-        previous_actions = ObsTerm(func=previous_actions)
+        lidar_stacked = ObsTerm(func=lidar_stacked)                          # [270] t, t-1, t-2
+        lidar_temporal_sector_diff = ObsTerm(func=lidar_temporal_sector_diff)  # [8]  motion hint
+        goal_distance = ObsTerm(func=goal_distance)                          # [1]
+        goal_angle = ObsTerm(func=goal_angle)                                # [1]
+        robot_velocity = ObsTerm(func=robot_velocity)                        # [2]
+        previous_actions = ObsTerm(func=previous_actions)                    # [2]
+        # total: 284 dims
 
         def __post_init__(self):
             self.enable_corruption = False

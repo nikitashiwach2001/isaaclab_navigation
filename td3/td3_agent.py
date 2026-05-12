@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from td3.actor_critic import Actor, Critic
+from td3.actor_critic import Actor, ActorGRU, Critic
 
 
 class TD3Agent:
@@ -22,6 +22,7 @@ class TD3Agent:
         policy_noise: float = 0.2,
         noise_clip: float = 0.5,
         policy_delay: int = 2,
+        use_gru: bool = False,
     ):
         self.device = torch.device(device)
 
@@ -33,20 +34,44 @@ class TD3Agent:
         self.policy_noise = policy_noise
         self.noise_clip = noise_clip
         self.policy_delay = policy_delay
+        self.use_gru = use_gru
 
         self.total_it = 0
 
-        self.actor = Actor(state_dim, action_dim, hidden_dim).to(self.device)
+        if use_gru:
+            self.actor = ActorGRU(state_dim, action_dim, hidden_dim).to(self.device)
+        else:
+            self.actor = Actor(state_dim, action_dim, hidden_dim).to(self.device)
         self.actor_target = copy.deepcopy(self.actor)
 
         self.critic = Critic(state_dim, action_dim, hidden_dim).to(self.device)
         self.critic_target = copy.deepcopy(self.critic)
 
-        self.actor_optimizer = torch.optim.Adam(self.actor.parameters(), lr=actor_lr)
+        if use_gru:
+            # Freeze the MLP backbone (fc1/fc2/fc3) — only GRU and gru_gate are trained.
+            # This prevents the speed-collapse that corrupts fc3 during fine-tuning
+            # and lets the GRU learn temporal corrections on top of the frozen v6 policy.
+            for name, param in self.actor.named_parameters():
+                if "gru" not in name:
+                    param.requires_grad = False
+            gru_params = [p for p in self.actor.parameters() if p.requires_grad]
+            self.actor_optimizer = torch.optim.Adam(gru_params, lr=actor_lr)
+        else:
+            self.actor_optimizer = torch.optim.Adam(self.actor.parameters(), lr=actor_lr)
         self.critic_optimizer = torch.optim.Adam(self.critic.parameters(), lr=critic_lr)
 
         self.last_actor_loss = torch.tensor(0.0, device=self.device)
         self.last_critic_loss = torch.tensor(0.0, device=self.device)
+
+        # Per-env GRU hidden state — initialized lazily on first select_action call
+        self._actor_hidden: torch.Tensor | None = None
+
+    def reset_hidden(self, env_ids):
+        """Zero out the GRU hidden state for the given environment indices."""
+        if self._actor_hidden is not None and len(env_ids) > 0:
+            # Clone to convert inference tensor → regular tensor before inplace update
+            self._actor_hidden = self._actor_hidden.clone()
+            self._actor_hidden[env_ids] = 0.0
 
     @torch.no_grad()
     def select_action(self, state: torch.Tensor) -> torch.Tensor:
@@ -58,9 +83,19 @@ class TD3Agent:
         Returns:
             action: [num_envs, action_dim] in [-1, 1]
         """
-
         state = state.to(self.device)
-        action = self.actor(state)
+
+        if self.use_gru:
+            assert isinstance(self.actor, ActorGRU)
+            if self._actor_hidden is None or self._actor_hidden.shape[0] != state.shape[0]:
+                self._actor_hidden = torch.zeros(
+                    state.shape[0], self.actor.hidden_dim, device=self.device
+                )
+            action, self._actor_hidden = self.actor(state, self._actor_hidden)
+        else:
+            assert isinstance(self.actor, Actor)
+            action = self.actor(state)
+
         action = torch.clamp(action, -1.0, 1.0)
         return action
 
@@ -75,8 +110,13 @@ class TD3Agent:
             noise = torch.randn_like(action) * self.policy_noise
             noise = torch.clamp(noise, -self.noise_clip, self.noise_clip)
 
-            next_action = self.actor_target(next_state) + noise
-            next_action = torch.clamp(next_action, -1.0, 1.0)
+            if self.use_gru:
+                assert isinstance(self.actor_target, ActorGRU)
+                next_action, _ = self.actor_target(next_state, hidden=None)
+            else:
+                assert isinstance(self.actor_target, Actor)
+                next_action = self.actor_target(next_state)
+            next_action = torch.clamp(next_action + noise, -1.0, 1.0)
 
             target_q1, target_q2 = self.critic_target(next_state, next_action)
             target_q = torch.min(target_q1, target_q2)
@@ -89,13 +129,20 @@ class TD3Agent:
 
         self.critic_optimizer.zero_grad()
         critic_loss.backward()
-        nn.utils.clip_grad_norm_(self.critic.parameters(), max_norm=1.0)
+        nn.utils.clip_grad_norm_(self.critic.parameters(), max_norm=0.3)
         self.critic_optimizer.step()
 
         self.last_critic_loss = critic_loss.detach()
 
         if self.total_it % self.policy_delay == 0:
-            actor_loss = -self.critic.q1_forward(state, self.actor(state)).mean()
+            if self.use_gru:
+                assert isinstance(self.actor, ActorGRU)
+                actor_out, _ = self.actor(state, hidden=None)
+            else:
+                assert isinstance(self.actor, Actor)
+                actor_out = self.actor(state)
+
+            actor_loss = -self.critic.q1_forward(state, actor_out).mean()
 
             self.actor_optimizer.zero_grad()
             actor_loss.backward()
@@ -128,6 +175,7 @@ class TD3Agent:
                 "actor_optimizer": self.actor_optimizer.state_dict(),
                 "critic_optimizer": self.critic_optimizer.state_dict(),
                 "total_it": self.total_it,
+                "use_gru": self.use_gru,
             },
             path,
         )
@@ -135,23 +183,38 @@ class TD3Agent:
     def load(self, path: str):
         checkpoint = torch.load(path, map_location=self.device)
 
-        self.actor.load_state_dict(checkpoint["actor"])
-        self.actor_target.load_state_dict(checkpoint["actor_target"])
+        # If checkpoint architecture differs (e.g. MLP → GRU), load FC weights only
+        ckpt_use_gru = checkpoint.get("use_gru", False)
+        strict = (ckpt_use_gru == self.use_gru)
+
+        self.actor.load_state_dict(checkpoint["actor"], strict=strict)
+        self.actor_target.load_state_dict(checkpoint["actor_target"], strict=strict)
         self.critic.load_state_dict(checkpoint["critic"])
         self.critic_target.load_state_dict(checkpoint["critic_target"])
-        self.actor_optimizer.load_state_dict(checkpoint["actor_optimizer"])
-        self.critic_optimizer.load_state_dict(checkpoint["critic_optimizer"])
-        self.total_it = checkpoint["total_it"]
+
+        self.total_it = checkpoint.get("total_it", 0)
+
+        if strict:
+            self.actor_optimizer.load_state_dict(checkpoint["actor_optimizer"])
+            self.critic_optimizer.load_state_dict(checkpoint["critic_optimizer"])
+        else:
+            print("[TD3] Partial load: GRU weights init randomly, FC weights from checkpoint.")
 
     def load_actor_only(self, path: str):
-        """Load actor weights only; critic stays freshly initialised.
-
-        Use this when the reward scale changes between runs so that the old
-        critic's Q-value estimates don't cause immediate divergence.
-        """
+        """Load actor weights only; critic stays freshly initialised."""
         checkpoint = torch.load(path, map_location=self.device)
-        self.actor.load_state_dict(checkpoint["actor"])
-        self.actor_target.load_state_dict(checkpoint["actor_target"])
-        self.actor_optimizer.load_state_dict(checkpoint["actor_optimizer"])
-        self.total_it = checkpoint["total_it"]
+
+        ckpt_use_gru = checkpoint.get("use_gru", False)
+        strict = (ckpt_use_gru == self.use_gru)
+
+        self.actor.load_state_dict(checkpoint["actor"], strict=strict)
+        self.actor_target.load_state_dict(checkpoint["actor_target"], strict=strict)
+
+        self.total_it = checkpoint.get("total_it", 0)
+
+        if strict:
+            self.actor_optimizer.load_state_dict(checkpoint["actor_optimizer"])
+
+        if not strict:
+            print("[TD3] Partial load: GRU weights init randomly, FC weights from checkpoint.")
         print(f"[TD3] Loaded actor only from {path}. Critic is fresh.")

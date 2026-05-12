@@ -53,7 +53,7 @@ LIDAR_CFG = MultiMeshRayCasterCfg(
 
         # static walls
         MultiMeshRayCasterCfg.RaycastTargetCfg(
-            prim_expr="{ENV_REGEX_NS}/wall.*",
+            prim_expr="{ENV_REGEX_NS}/wall_*",
             is_shared=True,
             merge_prim_meshes=True,
             track_mesh_transforms=False

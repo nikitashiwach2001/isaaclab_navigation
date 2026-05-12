@@ -111,6 +111,27 @@ torch.backends.cudnn.deterministic = False
 torch.backends.cudnn.benchmark = False
 
 
+class _TeeLogger:
+    """Duplicates stdout to a log file. Activated only during runner.learn()
+    so Isaac Sim startup noise is not captured."""
+
+    def __init__(self, path: str):
+        self._terminal = sys.stdout
+        self._file = open(path, "w", buffering=1)
+
+    def write(self, msg: str):
+        self._terminal.write(msg)
+        self._file.write(msg)
+
+    def flush(self):
+        self._terminal.flush()
+        self._file.flush()
+
+    def close(self):
+        sys.stdout = self._terminal
+        self._file.close()
+
+
 @hydra_task_config(args_cli.task, args_cli.agent)
 def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agent_cfg: RslRlBaseRunnerCfg):
     """Train with RSL-RL agent."""
@@ -175,7 +196,11 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
 
     # save resume path before creating a new log_dir
     if agent_cfg.resume or agent_cfg.algorithm.class_name == "Distillation":
-        resume_path = get_checkpoint_path(log_root_path, agent_cfg.load_run, agent_cfg.load_checkpoint)
+        _ckpt = agent_cfg.load_checkpoint
+        if _ckpt and os.path.isfile(_ckpt):
+            resume_path = _ckpt  # absolute or relative path given directly
+        else:
+            resume_path = get_checkpoint_path(log_root_path, agent_cfg.load_run, _ckpt)
 
     # wrap for video recording
     if args_cli.video:
@@ -213,10 +238,20 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     dump_yaml(os.path.join(log_dir, "params", "env.yaml"), env_cfg)
     dump_yaml(os.path.join(log_dir, "params", "agent.yaml"), agent_cfg)
 
+    # redirect stdout → file starting now (skips Isaac Sim startup noise)
+    os.makedirs(log_dir, exist_ok=True)
+    log_file = os.path.join(log_dir, "training.log")
+    tee = _TeeLogger(log_file)
+    sys.stdout = tee
+    print(f"[LOG] task={args_cli.task}  num_envs={env_cfg.scene.num_envs}  log_dir={log_dir}")
+    print(f"[LOG] max_iterations={agent_cfg.max_iterations}  num_steps_per_env={agent_cfg.num_steps_per_env}")
+
     # run training
     runner.learn(num_learning_iterations=agent_cfg.max_iterations, init_at_random_ep_len=True)
 
-    print(f"Training time: {round(time.time() - start_time, 2)} seconds")
+    elapsed = round(time.time() - start_time, 2)
+    print(f"[LOG] Training finished in {elapsed}s")
+    tee.close()  # restores sys.stdout
 
     # close the simulator
     env.close()
