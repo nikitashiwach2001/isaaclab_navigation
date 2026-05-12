@@ -39,8 +39,8 @@ class Stage4SceneCfg(BaseSceneCfg):
     inner_wall_6: RigidObjectCfg = _inner_wall("{ENV_REGEX_NS}/InnerWall_6", (-0.5,  1.5, 0.25), (1.0, 0.0, 0.0,  0.0))
     # inner_wall_7: RigidObjectCfg = _inner_wall("{ENV_REGEX_NS}/InnerWall_7", (-1.2,  0.092, 0.25), (0.707, 0.0, 0.0, -0.707))
 
-    # obstacle_1: RigidObjectCfg = STAGE4_OBSTACLE_1_CFG.replace(prim_path="{ENV_REGEX_NS}/Obstacle_1")
-    # obstacle_2: RigidObjectCfg = STAGE4_OBSTACLE_2_CFG.replace(prim_path="{ENV_REGEX_NS}/Obstacle_2")
+    obstacle_1: RigidObjectCfg = STAGE4_OBSTACLE_1_CFG.replace(prim_path="{ENV_REGEX_NS}/Obstacle_1")
+    obstacle_2: RigidObjectCfg = STAGE4_OBSTACLE_2_CFG.replace(prim_path="{ENV_REGEX_NS}/Obstacle_2")
 
     # obstacle_3: RigidObjectCfg = RigidObjectCfg(
     #     prim_path="{ENV_REGEX_NS}/Obstacle_3",

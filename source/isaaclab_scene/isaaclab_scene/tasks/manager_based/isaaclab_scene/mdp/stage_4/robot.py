@@ -78,11 +78,11 @@ LIDAR_CFG_4 = MultiMeshRayCasterCfg(
         # directions cannot share a single rigid transform. With merge=True the
         # combined mesh is baked at the initial position and never updates,
         # making both obstacles invisible to the LiDAR.
-        # MultiMeshRayCasterCfg.RaycastTargetCfg(
-        #     prim_expr="{ENV_REGEX_NS}/Obstacle_*",
-        #     track_mesh_transforms=True,
-        #     merge_prim_meshes=False,
-        # ),
+        MultiMeshRayCasterCfg.RaycastTargetCfg(
+            prim_expr="{ENV_REGEX_NS}/Obstacle_*",
+            track_mesh_transforms=True,
+            merge_prim_meshes=False,
+        ),
     ],
 )
 

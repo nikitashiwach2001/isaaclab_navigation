@@ -125,7 +125,11 @@ class TD3Agent:
 
         current_q1, current_q2 = self.critic(state, action)
 
-        critic_loss = F.mse_loss(current_q1, target_q) + F.mse_loss(current_q2, target_q)
+        # Huber loss (delta=20): quadratic for |error|<20, linear above.
+        # Prevents spike when a batch contains many terminal collision events (-200 reward)
+        # which would create TD errors of 200+ and explosive MSE gradients.
+        critic_loss = F.huber_loss(current_q1, target_q, delta=20.0) + \
+                      F.huber_loss(current_q2, target_q, delta=20.0)
 
         self.critic_optimizer.zero_grad()
         critic_loss.backward()

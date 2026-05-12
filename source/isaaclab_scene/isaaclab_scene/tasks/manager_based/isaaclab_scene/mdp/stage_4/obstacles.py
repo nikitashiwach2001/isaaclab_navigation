@@ -122,16 +122,6 @@ def update_moving_obstacles_stage4(env, _env_ids=None):
         env.s4_obs1_time = torch.rand(env.num_envs, device=env.device) * _OBS1_PERIOD
         env.s4_obs2_time = torch.rand(env.num_envs, device=env.device) * _OBS2_PERIOD
 
-    # Re-randomize obstacle phase for envs that just reset so each episode
-    # starts with a different obstacle configuration
-    if hasattr(env, "episode_length_buf"):
-        reset_mask = env.episode_length_buf <= 1
-        if reset_mask.any():
-            env.s4_obs1_time = env.s4_obs1_time.clone()
-            env.s4_obs2_time = env.s4_obs2_time.clone()
-            n = reset_mask.sum()
-            env.s4_obs1_time[reset_mask] = torch.rand(n, device=env.device) * _OBS1_PERIOD
-            env.s4_obs2_time[reset_mask] = torch.rand(n, device=env.device) * _OBS2_PERIOD
 
     env.s4_obs1_time = (env.s4_obs1_time + dt) % _OBS1_PERIOD
     env.s4_obs2_time = (env.s4_obs2_time + dt) % _OBS2_PERIOD
