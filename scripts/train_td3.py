@@ -35,12 +35,15 @@ parser.add_argument("--policy_noise", type=float, default=0.2)
 parser.add_argument("--noise_clip", type=float, default=0.5)
 parser.add_argument("--policy_delay", type=int, default=2)
 parser.add_argument("--expl_noise", type=float, default=0.1)
+parser.add_argument("--updates_per_step", type=int, default=1,
+                    help="Gradient updates per outer loop. Scale with num_envs to keep update-to-data ratio sane (rule: ~num_envs/16).")
 
 parser.add_argument("--save_interval", type=int, default=25_000)
 
 parser.add_argument("--run_name", type=str, default="td3_turtlebot_nav")
 parser.add_argument("--load_checkpoint", type=str, default=None, help="Path to TD3 checkpoint to load for finetuning.")
 parser.add_argument("--reset_critic", action="store_true", default=False, help="Load actor weights only; re-init critic fresh. Use when reward scale changes between runs.")
+parser.add_argument("--freeze_actor_steps", type=int, default=0, help="Env-steps during which only the critic updates. Lets a fresh critic learn Q under the loaded actor before actor gradients flow.")
 parser.add_argument("--use_gru", action="store_true", default=False, help="Use GRU actor for temporal memory.")
 
 AppLauncher.add_app_launcher_args(parser)
@@ -226,6 +229,7 @@ def main():
     logger(f"[INFO] actor_lr:     {args_cli.actor_lr}  critic_lr: {args_cli.critic_lr}")
     logger(f"[INFO] policy_delay: {args_cli.policy_delay}  tau: {args_cli.tau}  expl_noise: {args_cli.expl_noise}")
     logger(f"[INFO] batch_size:   {args_cli.batch_size}  buffer_size: {args_cli.buffer_size}  total_steps: {args_cli.total_steps}")
+    logger(f"[INFO] freeze_actor_steps: {args_cli.freeze_actor_steps}")
 
     agent = TD3Agent(
         state_dim=state_dim,
@@ -300,7 +304,12 @@ def main():
     window_action_angular_abs_sum = 0.0
     window_reward_step_sum = 0.0
     window_done_sum = 0.0
+    window_dyn_vicinity = 0   # env-steps with a moving obstacle within 1.0 m of the robot
+    window_dyn_close = 0      # env-steps with a moving obstacle within 0.6 m of the robot
     window_start_time = time.time()
+
+    # Cache moving-obstacle scene keys once (entities named obstacle_*)
+    _dyn_obstacle_keys = [k for k in env.unwrapped.scene.keys() if k.startswith("obstacle_")]
 
     last_losses = {
         "critic_loss": 0.0,
@@ -360,6 +369,16 @@ def main():
         if action_dim > 1:
             window_action_angular_abs_sum += torch.abs(action[:, 1]).sum().item()
 
+        # Dynamic-obstacle exposure: distance robot ↔ nearest moving obstacle (entity positions, not lidar)
+        if _dyn_obstacle_keys:
+            robot_xy_w = env.unwrapped.scene["robot"].data.root_pos_w[:, :2]
+            min_dyn_dist = torch.full((num_envs,), 1e6, device=device)
+            for okey in _dyn_obstacle_keys:
+                obs_xy_w = env.unwrapped.scene[okey].data.root_pos_w[:, :2]
+                min_dyn_dist = torch.minimum(min_dyn_dist, torch.norm(robot_xy_w - obs_xy_w, dim=-1))
+            window_dyn_vicinity += int((min_dyn_dist < 1.0).sum().item())
+            window_dyn_close += int((min_dyn_dist < 0.6).sum().item())
+
         if done.any():
             done_env_ids = torch.where(done)[0]
             ou_noise.reset(done_env_ids)
@@ -414,9 +433,11 @@ def main():
         global_step += num_envs
 
         if len(replay_buffer) >= args_cli.batch_size and global_step >= args_cli.start_steps:
-            losses = agent.train(replay_buffer, args_cli.batch_size)
-            if losses is not None:
-                last_losses = losses
+            freeze_actor = global_step < args_cli.freeze_actor_steps
+            for _ in range(args_cli.updates_per_step):
+                losses = agent.train(replay_buffer, args_cli.batch_size, freeze_actor=freeze_actor)
+                if losses is not None:
+                    last_losses = losses
 
         if global_step % args_cli.save_interval < num_envs:
             ckpt_path = os.path.join(save_dir, f"td3_step_{global_step}.pt")
@@ -441,6 +462,11 @@ def main():
                 logger=logger,
             )
 
+            if window_env_steps > 0:
+                logger(f"Dynamic-obstacle exposure | vicinity (<1.0m): "
+                       f"{100.0 * window_dyn_vicinity / window_env_steps:.2f}%   "
+                       f"close (<0.6m): {100.0 * window_dyn_close / window_env_steps:.2f}%")
+
             window_counts = {k: 0 for k in total_counts}
             window_reward_sum = 0.0
             window_step_sum = 0
@@ -451,6 +477,8 @@ def main():
             window_action_angular_abs_sum = 0.0
             window_reward_step_sum = 0.0
             window_done_sum = 0.0
+            window_dyn_vicinity = 0
+            window_dyn_close = 0
             window_start_time = time.time()
 
     total_finished = max(episode_count, 1)

@@ -19,11 +19,11 @@ logs/td3_stage2_stuck_penalty_v1/20260428_072837/td3_final.pt (stage2 best polic
 
 
 python scripts/play_td3.py \
-  --task Template-Isaaclab-Scene-v0 \
-  --num_envs 32 \
-  --hidden_dim 256 \
-  --checkpoint logs/td3_stage2_stuck_penalty_v1/20260428_072837/td3_final.pt \
-  --eval_episodes 200 \
+  --task IsaaclabScene-Stage4-v0 \
+  --num_envs 256 \
+  --hidden_dim 512 \
+  --checkpoint logs/may_15/stage4_scale2_dodge_swap/20260515_082510/td3_step_6500096.pt \
+  --eval_episodes 1000 \
   --headless
 
 ########################### Best Policies ################################
@@ -558,3 +558,398 @@ COLL_DYNAMIC:   117      (11.70%)
 COLL_STATIC:    30       (3.00%)
 COLL_BOUNDARY:  0        (0.00%)
 TIMEOUT:        97       (9.70%)
+
+
+
+may_13
+
+
+========== EVALUATION SUMMARY ==========
+Checkpoint: logs/may_13/stage4_open_stuck_v2/20260513_022216/td3_step_4000000.pt
+Total episodes: 1000
+SUCCESS:        791      (79.10%)
+COLL_DYNAMIC:   109      (10.90%)
+COLL_STATIC:    15       (1.50%)
+TIMEOUT:        85       (8.50%)
+
+========== EVALUATION SUMMARY ==========
+Checkpoint: logs/may_13/stage4_open_stuck_v2/20260513_022216/td3_step_5000192.pt
+Total episodes: 1000
+SUCCESS:        817      (81.70%)
+COLL_DYNAMIC:   103      (10.30%)
+COLL_STATIC:    12       (1.20%)
+TIMEOUT:        68       (6.80%)
+
+========== EVALUATION SUMMARY ==========
+Checkpoint: logs/may_13/stage4_open_stuck_v2/20260513_022216/td3_step_8000000.pt
+Total episodes: 1000
+SUCCESS:        831      (83.10%)
+COLL_DYNAMIC:   92       (9.20%)
+COLL_STATIC:    10       (1.00%)
+TIMEOUT:        67       (6.70%)
+
+========== EVALUATION SUMMARY ==========
+Checkpoint: logs/may_13/stage4_open_stuck_v2/20260513_022216/td3_final.pt
+Total episodes: 1000
+SUCCESS:        824      (82.40%)
+COLL_DYNAMIC:   106      (10.60%)
+COLL_STATIC:    12       (1.20%)
+TIMEOUT:        58       (5.80%)
+
+
+
+may_13th stage4_v3_dodge_stuck
+
+========== EVALUATION SUMMARY ==========
+Checkpoint: logs/may_13/stage4_v3_dodge_stuck/20260513_031202/td3_step_3000064.pt
+Total episodes: 1000
+SUCCESS:        821      (82.10%)
+COLL_DYNAMIC:   80       (8.00%)
+COLL_STATIC:    7        (0.70%)
+TIMEOUT:        92       (9.20%)
+
+
+========== EVALUATION SUMMARY ==========
+Checkpoint: logs/may_13/stage4_v3_dodge_stuck/20260513_031202/td3_step_3000064.pt
+Total episodes: 1000
+SUCCESS:        818      (81.80%)
+COLL_DYNAMIC:   67       (6.70%)
+COLL_STATIC:    9        (0.90%)
+TIMEOUT:        106      (10.60%)
+
+
+========== EVALUATION SUMMARY ==========
+Checkpoint: logs/may_13/stage4_v3_dodge_stuck/20260513_031202/td3_step_6000128.pt
+Total episodes: 1000
+SUCCESS:        797      (79.70%)
+COLL_DYNAMIC:   80       (8.00%)
+COLL_STATIC:    15       (1.50%)
+TIMEOUT:        108      (10.80%)
+
+
+========== EVALUATION SUMMARY ==========
+Checkpoint: logs/may_13/stage4_v3_dodge_stuck/20260513_031202/td3_step_7000064.pt
+Total episodes: 1000
+SUCCESS:        772      (77.20%)
+COLL_DYNAMIC:   93       (9.30%)
+COLL_STATIC:    11       (1.10%)
+TIMEOUT:        124      (12.40%)
+
+
+========== EVALUATION SUMMARY ==========
+Checkpoint: logs/may_13/stage4_v3_dodge_stuck/20260513_031202/td3_step_8000000.pt
+Total episodes: 1000
+SUCCESS:        710      (71.00%)
+COLL_DYNAMIC:   102      (10.20%)
+COLL_STATIC:    29       (2.90%)
+TIMEOUT:        159      (15.90%)
+
+========== EVALUATION SUMMARY ==========
+Checkpoint: logs/may_13/stage4_v3_dodge_stuck/20260513_031202/td3_final.pt
+Total episodes: 1000
+SUCCESS:        737      (73.70%)
+COLL_DYNAMIC:   84       (8.40%)
+COLL_STATIC:    17       (1.70%)
+TIMEOUT:        162      (16.20%)
+\
+
+
+
+next 
+
+
+
+========== EVALUATION SUMMARY ==========
+Checkpoint: logs/may_13/stage4_v4_dodge_only/20260513_033951/td3_step_3500032.pt
+Total episodes: 1000
+SUCCESS:        813      (81.30%)
+COLL_DYNAMIC:   92       (9.20%)
+COLL_STATIC:    8        (0.80%)
+COLL_BOUNDARY:  1        (0.10%)
+TIMEOUT:        86       (8.60%)
+
+
+========== EVALUATION SUMMARY ==========
+Checkpoint: logs/may_13/stage4_v4_dodge_only/20260513_033951/td3_step_4000000.pt
+Total episodes: 1000
+SUCCESS:        786      (78.60%)
+COLL_DYNAMIC:   104      (10.40%)
+COLL_STATIC:    12       (1.20%)
+TIMEOUT:        98       (9.80%)
+
+
+========== EVALUATION SUMMARY ==========
+Checkpoint: logs/may_13/stage4_v4_dodge_only/20260513_033951/td3_step_4500224.pt
+Total episodes: 1000
+SUCCESS:        773      (77.30%)
+COLL_DYNAMIC:   112      (11.20%)
+COLL_STATIC:    12       (1.20%)
+TIMEOUT:        103      (10.30%)
+
+========== EVALUATION SUMMARY ==========
+Checkpoint: logs/may_13/stage4_v4_dodge_only/20260513_033951/td3_step_5000192.pt
+Total episodes: 1000
+SUCCESS:        769      (76.90%)
+COLL_DYNAMIC:   101      (10.10%)
+COLL_STATIC:    11       (1.10%)
+TIMEOUT:        119      (11.90%)
+
+
+========== EVALUATION SUMMARY ==========
+Checkpoint: logs/may_13/stage4_v4_dodge_only/20260513_033951/td3_step_5500160.pt
+Total episodes: 1000
+SUCCESS:        766      (76.60%)
+COLL_DYNAMIC:   99       (9.90%)
+COLL_STATIC:    11       (1.10%)
+TIMEOUT:        124      (12.40%)
+
+========== EVALUATION SUMMARY =========
+Checkpoint: logs/may_13/stage4_v4_dodge_only/20260513_033951/td3_step_6000128.pt
+Total episodes: 1000
+SUCCESS:        677      (67.70%)
+COLL_DYNAMIC:   104      (10.40%)
+COLL_STATIC:    67       (6.70%)
+TIMEOUT:        152      (15.20%)
+
+========== EVALUATION SUMMARY ==========
+Checkpoint: logs/may_13/stage4_v4_dodge_only/20260513_033951/td3_final.pt
+Total episodes: 1000
+SUCCESS:        669      (66.90%)
+COLL_DYNAMIC:   103      (10.30%)
+COLL_STATIC:    72       (7.20%)
+TIMEOUT:        156      (15.60%)
+
+##################################################################################
+
+
+========== EVALUATION SUMMARY ==========
+Checkpoint: logs/may_13/stage5_from_v2_8M/20260513_040244/td3_step_10000128.pt
+Total episodes: 1000
+SUCCESS:        550      (55.00%)
+COLL_DYNAMIC:   258      (25.80%)
+COLL_STATIC:    63       (6.30%)
+TIMEOUT:        129      (12.90%)
+
+========== EVALUATION SUMMARY ==========
+Checkpoint: logs/may_13/stage5_from_v2_8M/20260513_040244/td3_step_11000064.pt
+Total episodes: 1000
+SUCCESS:        646      (64.60%)
+COLL_DYNAMIC:   238      (23.80%)
+COLL_STATIC:    12       (1.20%)
+TIMEOUT:        104      (10.40%)
+
+========== EVALUATION SUMMARY ==========
+Checkpoint: logs/may_13/stage5_from_v2_8M/20260513_040244/td3_step_12000000.pt
+Total episodes: 1000
+SUCCESS:        672      (67.20%)
+COLL_DYNAMIC:   235      (23.50%)
+COLL_STATIC:    14       (1.40%)
+TIMEOUT:        79       (7.90%)
+
+========== EVALUATION SUMMARY ==========
+Checkpoint: logs/may_13/stage5_from_v2_8M/20260513_040244/td3_step_13000192.pt
+Total episodes: 1000
+SUCCESS:        566      (56.60%)
+COLL_DYNAMIC:   244      (24.40%)
+COLL_STATIC:    53       (5.30%)
+COLL_BOUNDARY:  1        (0.10%)
+TIMEOUT:        136      (13.60%)
+
+========== EVALUATION SUMMARY ==========
+Checkpoint: logs/may_13/stage5_from_v2_8M/20260513_040244/td3_step_14000128.pt
+Total episodes: 1000
+SUCCESS:        644      (64.40%)
+COLL_DYNAMIC:   263      (26.30%)
+COLL_STATIC:    15       (1.50%)
+TIMEOUT:        78       (7.80%)
+
+========== EVALUATION SUMMARY ==========
+Checkpoint: logs/may_13/stage5_from_v2_8M/20260513_040244/td3_step_15000064.pt
+Total episodes: 1000
+SUCCESS:        657      (65.70%)
+COLL_DYNAMIC:   232      (23.20%)
+COLL_STATIC:    10       (1.00%)
+TIMEOUT:        101      (10.10%)
+
+========== EVALUATION SUMMARY ==========
+Checkpoint: logs/may_13/stage5_from_v2_8M/20260513_040244/td3_final.pt
+Total episodes: 1000
+SUCCESS:        663      (66.30%)
+COLL_DYNAMIC:   231      (23.10%)
+COLL_STATIC:    8        (0.80%)
+TIMEOUT:        98       (9.80%)
+
+##############################################################
+========== EVALUATION SUMMARY ==========
+Checkpoint: logs/may_13/stage5_dodge_boost_from_12M/20260513_043229/td3_step_5000192.pt
+Total episodes: 1000
+SUCCESS:        640      (64.00%)
+COLL_DYNAMIC:   246      (24.60%)
+COLL_STATIC:    14       (1.40%)
+TIMEOUT:        100      (10.00%)
+
+
+
+========== EVALUATION SUMMARY ==========
+Checkpoint: logs/may_13/stage5_dodge_boost_from_12M/20260513_043229/td3_step_6000128.pt
+Total episodes: 1000
+SUCCESS:        677      (67.70%)
+COLL_DYNAMIC:   207      (20.70%)
+COLL_STATIC:    25       (2.50%)
+TIMEOUT:        91       (9.10%)
+
+Checkpoint: logs/may_13/stage5_dodge_boost_from_12M/20260513_043229/td3_step_8000000.pt
+Total episodes: 1000
+SUCCESS:        651      (65.10%)
+COLL_DYNAMIC:   230      (23.00%)
+COLL_STATIC:    25       (2.50%)
+TIMEOUT:        94       (9.40%)
+
+Checkpoint: logs/may_13/stage5_dodge_boost_from_12M/20260513_043229/td3_step_9000192.pt
+Total episodes: 1000
+SUCCESS:        684      (68.40%)
+COLL_DYNAMIC:   201      (20.10%)
+COLL_STATIC:    18       (1.80%)
+COLL_BOUNDARY:  15       (1.50%)
+TIMEOUT:        82       (8.20%)
+
+Checkpoint: logs/may_13/stage5_dodge_boost_from_12M/20260513_043229/td3_step_10000128.pt
+Total episodes: 1000
+SUCCESS:        688      (68.80%)
+COLL_DYNAMIC:   192      (19.20%)
+COLL_STATIC:    27       (2.70%)
+TIMEOUT:        93       (9.30%)
+
+Checkpoint: logs/may_13/stage5_dodge_boost_from_12M/20260513_043229/td3_final.pt
+Total episodes: 1000
+SUCCESS:        657      (65.70%)
+COLL_DYNAMIC:   216      (21.60%)
+COLL_STATIC:    25       (2.50%)
+TIMEOUT:        102      (10.20%)
+
+##################################################################################
+
+best on scale 2.0
+
+Checkpoint: logs/may_13/stage5_side_dodge_from_10M/20260513_055215/td3_step_8000000.pt
+Total episodes: 1000
+SUCCESS:        742      (74.20%)
+COLL_DYNAMIC:   167      (16.70%)
+COLL_STATIC:    7        (0.70%)
+TIMEOUT:        84       (8.40%)
+
+
+===============================================================================================================
+
+''' Best on scale 1.0''''
+
+Checkpoint: logs/may_13/stage5_scale1_from_8M/20260513_061511/td3_step_7000064.pt
+Total episodes: 1000
+SUCCESS:        728      (72.80%)
+COLL_DYNAMIC:   209      (20.90%)
+COLL_STATIC:    12       (1.20%)
+COLL_BOUNDARY:  1        (0.10%)
+TIMEOUT:        50       (5.00%)
+
+
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+Checkpoint: logs/may_13/stage5_closing_proximity_from_7M/20260513_064432/td3_step_6000128.pt
+Total episodes: 1000
+SUCCESS:        736      (73.60%)
+COLL_DYNAMIC:   213      (21.30%)
+COLL_STATIC:    5        (0.50%)
+COLL_BOUNDARY:  1        (0.10%)
+TIMEOUT:        45       (4.50%)
+
+
+Checkpoint: logs/may_13/stage5_closing_proximity_from_7M/20260513_064432/td3_step_9000192.pt
+Total episodes: 1000
+SUCCESS:        735      (73.50%)
+COLL_DYNAMIC:   209      (20.90%)
+COLL_STATIC:    8        (0.80%)
+TIMEOUT:        48       (4.80%)
+
+
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+Checkpoint: logs/may_13/stage5_closing_strong_from_6M/20260513_071243/td3_step_5000192.pt
+Total episodes: 1000
+SUCCESS:        759      (75.90%)
+COLL_DYNAMIC:   188      (18.80%)
+COLL_STATIC:    9        (0.90%)
+TIMEOUT:        44       (4.40%)
+
+
+ 
+Checkpoint: logs/may_13/stage5_polish_from_5M/20260513_073125/td3_step_3500032.pt
+Total episodes: 1000
+SUCCESS:        679      (67.90%)
+COLL_DYNAMIC:   192      (19.20%)
+COLL_STATIC:    17       (1.70%)
+TIMEOUT:        112      (11.20%)
+
+Checkpoint: logs/may_13/stage5_polish_from_5M/20260513_073125/td3_step_4000000.pt
+Total episodes: 1000
+SUCCESS:        665      (66.50%)
+COLL_DYNAMIC:   200      (20.00%)
+COLL_STATIC:    27       (2.70%)
+TIMEOUT:        108      (10.80%)
+
+Checkpoint: logs/may_13/stage5_polish_from_5M/20260513_073125/td3_final.pt
+Total episodes: 1000
+SUCCESS:        670      (67.00%)
+COLL_DYNAMIC:   199      (19.90%)
+COLL_STATIC:    25       (2.50%)
+TIMEOUT:        106      (10.60%)
+
+
+
+=====================================================================================================
+Checkpoint: logs/may_13/new_obervation_space/stage31_multistep_diff/20260513_092428/td3_step_9000192.pt
+Total episodes: 1000
+SUCCESS:        620      (62.00%)
+COLL_STATIC:    5        (0.50%)
+TIMEOUT:        375      (37.50%)
+
+it is stuck near the static walls
+Checkpoint: logs/may_13/new_obervation_space/stage31_multistep_diff/20260513_092428/td3_step_10000128.pt
+Total episodes: 1000
+SUCCESS:        704      (70.40%)
+COLL_BOUNDARY:  1        (0.10%)
+TIMEOUT:        295      (29.50%)
+
+
+scale = 2.0
+
+Checkpoint: logs/may_14/stage4_backward_from_82/20260514_093921/td3_step_11000064.pt
+Total episodes: 1000
+SUCCESS:        777      (77.70%)
+COLL_DYNAMIC:   65       (6.50%)
+COLL_STATIC:    20       (2.00%)
+COLL_BOUNDARY:  26       (2.60%)
+TIMEOUT:        112      (11.20%)
+
+
+
+n
+cp logs/may_14/stage31_v3_velbased/20260514_042121/td3_step_5500160.pt \
+   logs/may_14/stage31_v3_velbased/BEST_5500_90pct.pt
+
+
+Stage 1 (100%)	stage1_6frames_randstart/td3_final.pt	100%	0%	0%	0%
+Stage 3.1 (static)	stage31_continue/td3_final.pt	100%	0%	0%	0%
+Stage 4 SCALE=4.0	may_14/stage4_scale4_stronger_dyn/td3_final.pt	88.60%	10.40%	1.00%	<0.5%
+Stage 4 SCALE=2.0	may_15/stage4_scale2_yield_resume_fix/td3_step_9500160.pt	86.80%	11.70%	1.50%	~0%
+
+Checkpoint: logs/may_15/phase2_revised/20260515_114116/td3_step_1200128.pt
+
+scale 2.0
+Checkpo int: logs/yawfix_scale4_from_93/20260515_150856/td3_step_4000000.pt
+Total episodes: 1000
+SUCCESS:        866      (86.60%)
+COLL_DYNAMIC:   76       (7.60%)
+COLL_STATIC:    1        (0.10%)
+COLL_BOUNDARY:  5        (0.50%)
+TIMEOUT:        52       (5.20%)

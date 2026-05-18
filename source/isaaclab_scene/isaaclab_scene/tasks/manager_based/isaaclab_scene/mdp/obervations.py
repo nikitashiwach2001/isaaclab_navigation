@@ -72,14 +72,16 @@ def lidar_scan(env: ManagerBasedRLEnv) -> torch.Tensor:
     return _compute_lidar_scan(env)
 
 
-N_LIDAR_HISTORY = 3  # frames stacked: t, t-1, t-2
+N_LIDAR_HISTORY = 6  # frames stacked: t, t-1, t-2, t-3, t-4, t-5
+# Extended from 3 → 6 to give the policy enough history to estimate obstacle
+# velocity AND acceleration for trajectory prediction (5 velocity samples + 4 accel).
 
 
 def lidar_stacked(env: ManagerBasedRLEnv) -> torch.Tensor:
     """
-    Stacked LiDAR frames [t, t-1, t-2] concatenated along the ray axis.
+    Stacked LiDAR frames [t, t-1, ..., t-(N_LIDAR_HISTORY-1)] concatenated along the ray axis.
 
-    Shape: [num_envs, 90 * N_LIDAR_HISTORY]  →  [num_envs, 270]
+    Shape: [num_envs, 90 * N_LIDAR_HISTORY]  →  [num_envs, 540] for N_LIDAR_HISTORY=6
 
     Why this beats temporal_sector_diff alone:
       - Cross-path obstacles (moving left-to-right) keep near-constant range →
@@ -285,13 +287,13 @@ class ObservationsCfg:
 
     @configclass
     class PolicyCfg(ObsGroup):
-        lidar_stacked = ObsTerm(func=lidar_stacked)                          # [270] t, t-1, t-2
-        lidar_temporal_sector_diff = ObsTerm(func=lidar_temporal_sector_diff)  # [8]  motion hint
+        lidar_stacked = ObsTerm(func=lidar_stacked)                          # [540] 6 frames × 90 rays
+        lidar_temporal_sector_diff = ObsTerm(func=lidar_temporal_sector_diff)  # [8]   motion hint
         goal_distance = ObsTerm(func=goal_distance)                          # [1]
         goal_angle = ObsTerm(func=goal_angle)                                # [1]
         robot_velocity = ObsTerm(func=robot_velocity)                        # [2]
         previous_actions = ObsTerm(func=previous_actions)                    # [2]
-        # total: 284 dims
+        # total: 554 dims
 
         def __post_init__(self):
             self.enable_corruption = False

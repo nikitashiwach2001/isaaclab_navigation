@@ -5,7 +5,7 @@ from isaaclab.utils import configclass
 from . import mdp
 
 from .isaaclab_scene_env_cfg import BaseSceneCfg, BaseEventsCfg, BaseEnvCfg
-from .mdp.rewards import PPORewardsCfg
+from .mdp.rewards import StaticRewardsCfg, Stage4CleanRewardsCfg, RewardsCfg
 from .mdp.stage_4.obstacles import (
     STAGE4_OBSTACLE_1_CFG,
     STAGE4_OBSTACLE_2_CFG,
@@ -60,6 +60,20 @@ class Stage4SceneCfg(BaseSceneCfg):
     # )
 
 @configclass
+class Stage31SceneCfg(BaseSceneCfg):
+    """Stage 3.1 scene: walls only (3 inner walls), no cylinder obstacles.
+
+    Removing cylinders is important here because Stage 3.1 doesn't move them —
+    if they stayed at (2.0, 2.0) and (-2.0, -2.0) they'd permanently block goal
+    positions (1.8, 2.0) and (-1.8, -2.0), wasting ~13% of episodes.
+    """
+
+    inner_wall_2: RigidObjectCfg = _inner_wall("{ENV_REGEX_NS}/InnerWall_2", (-0.5, -2.0, 0.25), (0.707, 0.0, 0.0, -0.707))
+    inner_wall_3: RigidObjectCfg = _inner_wall("{ENV_REGEX_NS}/InnerWall_3", ( 1.0, -1.0, 0.25), (0.707, 0.0, 0.0,  0.707))
+    inner_wall_6: RigidObjectCfg = _inner_wall("{ENV_REGEX_NS}/InnerWall_6", (-0.5,  1.5, 0.25), (1.0,   0.0, 0.0,  0.0))
+
+
+@configclass
 class Stage31EventsCfg(BaseEventsCfg):
     """Stage 3.1 events: reset robot + randomize goal, no obstacle movement."""
 
@@ -86,27 +100,37 @@ class Stage4EventsCfg(BaseEventsCfg):
 
 @configclass
 class Stage31EnvCfg(BaseEnvCfg):
-    """Stage 3.1: Stage4 maze (inner walls + static obstacle cylinders), no movement.
+    """Stage 3.1: walls-only maze (no cylinder obstacles).
 
     Curriculum step between Stage1 (open arena) and Stage4 (moving obstacles).
     Robot masters static maze navigation before learning dynamic avoidance.
+    Cylinders excluded because they'd permanently block ~13% of goal positions.
+
+    Uses StaticRewardsCfg (navigation_reward_static) which excludes Stage 5-specific
+    dynamic-obstacle reward terms that fire wrongly for static walls during turns.
     """
 
-    scene: Stage4SceneCfg = Stage4SceneCfg()
+    scene: Stage31SceneCfg = Stage31SceneCfg()
     events: Stage31EventsCfg = Stage31EventsCfg()
+    rewards: StaticRewardsCfg = Stage4CleanRewardsCfg()
     enable_lidar_temporal_diff: bool = True
 
 
 @configclass
 class Stage4EnvCfg(BaseEnvCfg):
-    """Stage 4: full arena with outer walls, inner walls, and two moving obstacles."""
+    """Stage 4: full arena with outer walls, inner walls, and two moving obstacles.
+
+    Uses RewardsCfg (navigation_reward → navigation_reward_stage4) — the full reward
+    with r_closing_proximity and r_left_dodge / r_right_dodge.
+    """
 
     scene: Stage4SceneCfg = Stage4SceneCfg()
     events: Stage4EventsCfg = Stage4EventsCfg()
+    rewards: RewardsCfg = Stage4CleanRewardsCfg()
     enable_lidar_temporal_diff: bool = True
 
 
-@configclass
-class Stage4PPOEnvCfg(Stage4EnvCfg):
-    """Stage4EnvCfg with terminal rewards added for PPO (RSL-RL does not apply them externally)."""
-    rewards: PPORewardsCfg = PPORewardsCfg()
+# @configclass
+# class Stage4PPOEnvCfg(Stage4EnvCfg):
+#     """Stage4EnvCfg with terminal rewards added for PPO (RSL-RL does not apply them externally)."""
+#     rewards: PPORewardsCfg = PPORewardsCfg()

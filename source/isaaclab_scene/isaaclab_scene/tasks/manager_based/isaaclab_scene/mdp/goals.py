@@ -31,6 +31,75 @@ def ensure_goal_pos_w(env: ManagerBasedRLEnv) -> torch.Tensor:
     return env.goal_pos_w
 
 
+INNER_WALL_KEEPOUT = 0.75   # min distance from any inner wall center to a safe spawn
+OBSTACLE_KEEPOUT   = 0.6    # min distance from any obstacle initial position
+
+
+def randomize_robot_positions(env: ManagerBasedRLEnv, env_ids: torch.Tensor | None = None):
+    """Place the robot at a random position + orientation in the arena.
+
+    Avoids:
+        - Inner walls (any scene entry whose name starts with 'inner_wall_')
+        - Moving obstacles (entries starting with 'obstacle_') at their current poses
+
+    Random yaw in [-π, π] so the robot does not always start facing the same direction.
+
+    Stage 1 (open arena) automatically has empty wall list — no special handling needed.
+    """
+    if env_ids is None:
+        env_ids = torch.arange(env.num_envs, device=env.device)
+    env_ids = env_ids.to(dtype=torch.long, device=env.device)
+    num_reset_envs = len(env_ids)
+
+    robot = env.scene["robot"]
+    env_origins_xy = env.scene.env_origins[env_ids, :2]
+
+    # Collect keep-out points from current scene state
+    wall_keys     = [k for k in env.scene.keys() if k.startswith("inner_wall_")]
+    obstacle_keys = [k for k in env.scene.keys() if k.startswith("obstacle_")]
+
+    # Rejection sampling: random XY in arena, resample if too close to walls/obstacles
+    random_xy_local = (torch.rand((num_reset_envs, 2), device=env.device) * 2.0 - 1.0) * ARENA_LIMIT
+    for _ in range(20):
+        bad = torch.zeros(num_reset_envs, dtype=torch.bool, device=env.device)
+        for wkey in wall_keys:
+            wall_xy_w     = env.scene[wkey].data.root_pos_w[env_ids, :2]
+            wall_xy_local = wall_xy_w - env_origins_xy
+            bad = bad | (torch.norm(random_xy_local - wall_xy_local, dim=-1) < INNER_WALL_KEEPOUT)
+        for okey in obstacle_keys:
+            obs_xy_w     = env.scene[okey].data.root_pos_w[env_ids, :2]
+            obs_xy_local = obs_xy_w - env_origins_xy
+            bad = bad | (torch.norm(random_xy_local - obs_xy_local, dim=-1) < OBSTACLE_KEEPOUT)
+        if not bad.any():
+            break
+        resampled = (torch.rand((int(bad.sum()), 2), device=env.device) * 2.0 - 1.0) * ARENA_LIMIT
+        random_xy_local[bad] = resampled
+
+    # Random yaw in [-π, π], encoded as quaternion (w, x, y, z) for rotation about Z
+    yaw = (torch.rand(num_reset_envs, device=env.device) * 2.0 - 1.0) * 3.14159265
+    qw = torch.cos(yaw * 0.5)
+    qz = torch.sin(yaw * 0.5)
+    qx = torch.zeros_like(qw)
+    qy = torch.zeros_like(qw)
+
+    # Build 7-D pose [x, y, z, qw, qx, qy, qz]
+    pos_w  = robot.data.root_pos_w.clone()
+    quat_w = robot.data.root_quat_w.clone()
+    pos_w[env_ids, 0] = env_origins_xy[:, 0] + random_xy_local[:, 0]
+    pos_w[env_ids, 1] = env_origins_xy[:, 1] + random_xy_local[:, 1]
+    # leave z (height) as default
+    quat_w[env_ids, 0] = qw
+    quat_w[env_ids, 1] = qx
+    quat_w[env_ids, 2] = qy
+    quat_w[env_ids, 3] = qz
+    pose = torch.cat([pos_w[env_ids], quat_w[env_ids]], dim=-1)
+    robot.write_root_pose_to_sim(pose, env_ids=env_ids)
+
+    # Zero out velocity so robot starts from rest
+    vel = torch.zeros((num_reset_envs, 6), device=env.device)
+    robot.write_root_velocity_to_sim(vel, env_ids=env_ids)
+
+
 def randomize_goal_positions(env: ManagerBasedRLEnv, env_ids: torch.Tensor | None = None):
     """Place the goal at a random position at least MIN_START_GOAL_DIST away from the robot."""
 

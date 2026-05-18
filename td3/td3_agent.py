@@ -99,8 +99,14 @@ class TD3Agent:
         action = torch.clamp(action, -1.0, 1.0)
         return action
 
-    def train(self, replay_buffer, batch_size: int):
-        """One TD3 training update."""
+    def train(self, replay_buffer, batch_size: int, freeze_actor: bool = False):
+        """One TD3 training update.
+
+        If freeze_actor=True, only the critic is updated this step. Useful for
+        the warm-up phase after --reset_critic so the critic learns the new
+        reward's Q-landscape under the loaded policy without the actor
+        drifting toward random-Q gradients.
+        """
 
         self.total_it += 1
 
@@ -138,7 +144,7 @@ class TD3Agent:
 
         self.last_critic_loss = critic_loss.detach()
 
-        if self.total_it % self.policy_delay == 0:
+        if self.total_it % self.policy_delay == 0 and not freeze_actor:
             if self.use_gru:
                 assert isinstance(self.actor, ActorGRU)
                 actor_out, _ = self.actor(state, hidden=None)
