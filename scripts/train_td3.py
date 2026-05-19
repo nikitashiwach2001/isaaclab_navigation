@@ -43,8 +43,8 @@ parser.add_argument("--save_interval", type=int, default=25_000)
 parser.add_argument("--run_name", type=str, default="td3_turtlebot_nav")
 parser.add_argument("--load_checkpoint", type=str, default=None, help="Path to TD3 checkpoint to load for finetuning.")
 parser.add_argument("--reset_critic", action="store_true", default=False, help="Load actor weights only; re-init critic fresh. Use when reward scale changes between runs.")
-parser.add_argument("--freeze_actor_steps", type=int, default=0, help="Env-steps during which only the critic updates. Lets a fresh critic learn Q under the loaded actor before actor gradients flow.")
 parser.add_argument("--use_gru", action="store_true", default=False, help="Use GRU actor for temporal memory.")
+parser.add_argument("--use_conv", action="store_true", default=False, help="Use 1D conv lidar encoder (ConvActor/ConvCritic). Not weight-compatible with MLP checkpoints.")
 
 AppLauncher.add_app_launcher_args(parser)
 args_cli = parser.parse_args()
@@ -95,7 +95,11 @@ class TrainingLogger:
 SUCCESS_REWARD    =  300.0
 COLLISION_PENALTY =  200.0
 TUMBLE_PENALTY    =  200.0
-TIMEOUT_PENALTY   =  100.0
+# A time limit is NOT a failure (Pardo et al. 2018). Penalising it as one,
+# while ALSO cutting the bootstrap on truncation (see replay_buffer.add below),
+# trained the critic that ~every state is worth ≈ -100 with no future.
+# Speed is already incentivised by the per-step time cost + gamma discounting.
+TIMEOUT_PENALTY   =  0.0
 
 
 def get_env_buffer(env, name: str, num_envs: int, device) -> torch.Tensor:
@@ -229,7 +233,7 @@ def main():
     logger(f"[INFO] actor_lr:     {args_cli.actor_lr}  critic_lr: {args_cli.critic_lr}")
     logger(f"[INFO] policy_delay: {args_cli.policy_delay}  tau: {args_cli.tau}  expl_noise: {args_cli.expl_noise}")
     logger(f"[INFO] batch_size:   {args_cli.batch_size}  buffer_size: {args_cli.buffer_size}  total_steps: {args_cli.total_steps}")
-    logger(f"[INFO] freeze_actor_steps: {args_cli.freeze_actor_steps}")
+    logger(f"[INFO] use_conv:    {args_cli.use_conv}  use_gru: {args_cli.use_gru}")
 
     agent = TD3Agent(
         state_dim=state_dim,
@@ -244,6 +248,7 @@ def main():
         noise_clip=args_cli.noise_clip,
         policy_delay=args_cli.policy_delay,
         use_gru=args_cli.use_gru,
+        use_conv=args_cli.use_conv,
     )
 
     if args_cli.load_checkpoint is not None:
@@ -316,6 +321,17 @@ def main():
         "actor_loss": 0.0,
     }
 
+    # Heartbeat: compact health line every ~10 s of wall clock so you can
+    # tail -f the log and see in real time whether training is healthy.
+    HEARTBEAT_INTERVAL_S = 10.0
+    hb_start_time = time.time()
+    hb_env_steps = 0
+    hb_reward_sum = 0.0
+    hb_action_linear_sum = 0.0
+    hb_action_angular_abs_sum = 0.0
+    hb_episode_count = 0
+    hb_counts = {k: 0 for k in total_counts}
+
     while simulation_app.is_running() and global_step < args_cli.total_steps:
         with torch.inference_mode():
             if global_step < args_cli.start_steps:
@@ -348,26 +364,41 @@ def main():
         if TIMEOUT_PENALTY != 0.0:
             reward = torch.where(truncated & ~goal_reached_buf & ~collision_buf & ~tumble_buf, reward - TIMEOUT_PENALTY, reward)
 
+        # Bootstrap mask must use `terminated` ONLY, never `done`.
+        # `terminated` = goal/collision/tumble (true terminals: no future, so
+        # zero the bootstrap). `truncated` = time_out, an ARTIFICIAL cutoff —
+        # the robot's future value is real, so it MUST bootstrap. Passing the
+        # combined `done` here zeroed the bootstrap on every timeout; with
+        # ~98-100% timeouts that severed value propagation and collapsed the
+        # critic. `done` is still used below for episode bookkeeping only.
         replay_buffer.add(
             states=state,
             actions=action,
             rewards=reward,
             next_states=next_state,
-            dones=done,
+            dones=terminated,
         )
 
         episode_reward_sum += reward
         episode_step_count += 1
 
-        # Window step stats only; no per-step printing.
-        window_env_steps += num_envs
-        window_reward_step_sum += reward.sum().item()
-        window_done_sum += done.sum().item()
+        reward_sum_step = reward.sum().item()
+        done_sum_step = done.sum().item()
+        action_linear_sum_step = action[:, 0].sum().item()
+        action_angular_abs_sum_step = torch.abs(action[:, 1]).sum().item() if action_dim > 1 else 0.0
 
-        # Normalized action stats. action[:, 0] is linear command, action[:, 1] angular command.
-        window_action_linear_sum += action[:, 0].sum().item()
-        if action_dim > 1:
-            window_action_angular_abs_sum += torch.abs(action[:, 1]).sum().item()
+        # Window step stats (used by checkpoint summary)
+        window_env_steps += num_envs
+        window_reward_step_sum += reward_sum_step
+        window_done_sum += done_sum_step
+        window_action_linear_sum += action_linear_sum_step
+        window_action_angular_abs_sum += action_angular_abs_sum_step
+
+        # Heartbeat accumulators (reset every HB print, ~10 s cadence)
+        hb_env_steps += num_envs
+        hb_reward_sum += reward_sum_step
+        hb_action_linear_sum += action_linear_sum_step
+        hb_action_angular_abs_sum += action_angular_abs_sum_step
 
         # Dynamic-obstacle exposure: distance robot ↔ nearest moving obstacle (entity positions, not lidar)
         if _dyn_obstacle_keys:
@@ -422,6 +453,8 @@ def main():
 
                 total_counts[outcome] += 1
                 window_counts[outcome] += 1
+                hb_counts[outcome] += 1
+                hb_episode_count += 1
 
                 window_reward_sum += epi_reward
                 window_step_sum += epi_steps
@@ -433,9 +466,8 @@ def main():
         global_step += num_envs
 
         if len(replay_buffer) >= args_cli.batch_size and global_step >= args_cli.start_steps:
-            freeze_actor = global_step < args_cli.freeze_actor_steps
             for _ in range(args_cli.updates_per_step):
-                losses = agent.train(replay_buffer, args_cli.batch_size, freeze_actor=freeze_actor)
+                losses = agent.train(replay_buffer, args_cli.batch_size)
                 if losses is not None:
                     last_losses = losses
 
@@ -480,6 +512,44 @@ def main():
             window_dyn_vicinity = 0
             window_dyn_close = 0
             window_start_time = time.time()
+
+        # Heartbeat: print compact health line every ~10 s of wall clock.
+        # Tail -f the training.log to watch in real time. Key signals:
+        #   lin > 0 → policy is moving forward (not crawling)
+        #   c_loss stable / not spiking 10× → critic is converging
+        #   r/s trending positive → reward signal is healthy
+        #   SR climbing checkpoint-to-checkpoint → policy is improving
+        now = time.time()
+        hb_elapsed = now - hb_start_time
+        if hb_elapsed >= HEARTBEAT_INTERVAL_S:
+            fps = hb_env_steps / max(hb_elapsed, 1e-6)
+            if hb_env_steps > 0:
+                r_step = hb_reward_sum / hb_env_steps
+                lin_mean = hb_action_linear_sum / hb_env_steps
+                ang_mean = hb_action_angular_abs_sum / hb_env_steps
+            else:
+                r_step = lin_mean = ang_mean = 0.0
+            ep = max(hb_episode_count, 1)
+            sr = 100.0 * hb_counts['success'] / ep
+            cs = 100.0 * hb_counts['coll_static'] / ep
+            cd = 100.0 * hb_counts['coll_dynamic'] / ep
+            to = 100.0 * hb_counts['timeout'] / ep
+
+            logger(
+                f"[HB] step={global_step:>9d} fps={fps:>5.0f} "
+                f"r/s={r_step:+.3f} lin={lin_mean:+.3f} |ang|={ang_mean:.3f} "
+                f"c={last_losses['critic_loss']:8.3f} a={last_losses['actor_loss']:+8.2f} "
+                f"| epi={hb_episode_count:>4d} SR={sr:5.1f}% "
+                f"S={cs:4.1f}% D={cd:4.1f}% T={to:4.1f}%"
+            )
+
+            hb_start_time = now
+            hb_env_steps = 0
+            hb_reward_sum = 0.0
+            hb_action_linear_sum = 0.0
+            hb_action_angular_abs_sum = 0.0
+            hb_episode_count = 0
+            hb_counts = {k: 0 for k in total_counts}
 
     total_finished = max(episode_count, 1)
 

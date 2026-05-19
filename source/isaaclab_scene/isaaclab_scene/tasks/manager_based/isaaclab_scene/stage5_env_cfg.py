@@ -6,7 +6,6 @@ from isaaclab.utils import configclass
 from . import mdp
 
 from .isaaclab_scene_env_cfg import BaseSceneCfg, BaseEventsCfg, BaseEnvCfg
-from .mdp.rewards import PPORewardsCfg
 from .mdp.stage_5.obstacles import (
     STAGE5_OBSTACLE_1_CFG,
     STAGE5_OBSTACLE_2_CFG,
@@ -74,7 +73,3 @@ class Stage5EnvCfg(BaseEnvCfg):
     enable_lidar_temporal_diff: bool = True
 
 
-@configclass
-class Stage5PPOEnvCfg(Stage5EnvCfg):
-    """Stage5EnvCfg with terminal rewards added for PPO (RSL-RL does not apply them externally)."""
-    rewards: PPORewardsCfg = PPORewardsCfg()

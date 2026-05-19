@@ -22,6 +22,7 @@ parser.add_argument("--disable_fabric", action="store_true", default=False)
 parser.add_argument("--hidden_dim", type=int, default=256)
 parser.add_argument("--eval_episodes", type=int, default=100)
 parser.add_argument("--use_gru", action="store_true", default=False, help="Use GRU actor.")
+parser.add_argument("--use_conv", action="store_true", default=False, help="Use 1D conv lidar encoder. Must match the checkpoint's architecture.")
 
 # Isaac Lab launcher args
 AppLauncher.add_app_launcher_args(parser)
@@ -129,6 +130,7 @@ def main():
         device=device,
         hidden_dim=args_cli.hidden_dim,
         use_gru=args_cli.use_gru,
+        use_conv=args_cli.use_conv,
     )
 
     agent.load(args_cli.checkpoint)
@@ -160,6 +162,9 @@ def main():
         terminated=0,
     )
 
+    from collections import defaultdict
+    per_goal_counts = defaultdict(lambda: defaultdict(int))
+
     # -------------------------
     # Play / Evaluate loop
     # -------------------------
@@ -187,6 +192,10 @@ def main():
                 collision_boundary_buf = get_env_buffer(env, "collision_boundary_buf",  num_envs, device)
                 tumble_buf             = get_env_buffer(env, "tumble_buf",              num_envs, device)
 
+                env_origins = env.unwrapped.scene.env_origins[:, :2]
+                goal_pos_w  = env.unwrapped.goal_pos_w
+                goal_local  = goal_pos_w - env_origins
+
                 for env_id in done_env_ids.tolist():
                     episode_count += 1
 
@@ -195,6 +204,10 @@ def main():
 
                     goal_dist_real  = state[env_id, GOAL_DIST_IDX].item()  * MAX_GOAL_DIST
                     goal_angle_norm = state[env_id, GOAL_ANGLE_IDX].item()
+
+                    gx = round(goal_local[env_id, 0].item(), 1)
+                    gy = round(goal_local[env_id, 1].item(), 1)
+                    goal_key = (gx, gy)
 
                     # Priority: goal_reached > collision > tumble > timeout
                     if goal_reached_buf[env_id]:
@@ -222,6 +235,9 @@ def main():
                         outcome = "TERMINATED"
                         counts["terminated"] += 1
 
+                    per_goal_counts[goal_key]["total"] += 1
+                    per_goal_counts[goal_key][outcome] += 1
+
                     print(
                         f"Epi: {episode_count:<5} "
                         f"env: {env_id:<3} "
@@ -241,6 +257,18 @@ def main():
                             episode_count=episode_count,
                             counts=counts,
                         )
+
+                        print("\n========== PER-GOAL BREAKDOWN ==========")
+                        print(f"{'goal (x,y)':<14} {'N':>4} {'SR':>7} {'STATIC':>7} {'DYN':>5} {'TIMEOUT':>8}")
+                        for g, cs in sorted(per_goal_counts.items(), key=lambda kv: kv[1].get("SUCCESS", 0) / max(kv[1]["total"], 1)):
+                            n = cs["total"]
+                            sr = 100.0 * cs.get("SUCCESS", 0) / max(n, 1)
+                            cs_static = 100.0 * cs.get("COLL_STATIC", 0) / max(n, 1)
+                            cs_dyn = 100.0 * cs.get("COLL_DYNAMIC", 0) / max(n, 1)
+                            cs_to = 100.0 * cs.get("TIMEOUT", 0) / max(n, 1)
+                            print(f"({g[0]:>4.1f},{g[1]:>4.1f})  {n:>4} {sr:>6.1f}% {cs_static:>6.1f}% {cs_dyn:>4.1f}% {cs_to:>7.1f}%")
+                        print("========================================\n")
+
                         env.close()
                         return
 

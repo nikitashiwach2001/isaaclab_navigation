@@ -4,7 +4,7 @@ from isaaclab.utils import configclass
 from isaaclab.envs.mdp import reset_scene_to_default
 
 from .isaaclab_scene_env_cfg import BaseSceneCfg, BaseEnvCfg
-from .mdp.rewards import PPORewardsCfg
+from .mdp.rewards import StaticRewardsCfgV4
 from . import mdp
 
 
@@ -56,13 +56,10 @@ class Stage1EventsCfg:
 
 @configclass
 class Stage1EnvCfg(BaseEnvCfg):
-    """Stage 1: open arena, goal-seeking only. Used as warm-up before Stage 4."""
+    """Stage 1: open arena, goal-seeking only. Used as warm-up before Stage 3.1 / Stage 4."""
     scene: Stage1SceneCfg = Stage1SceneCfg()
     events: Stage1EventsCfg = Stage1EventsCfg()
+    rewards: StaticRewardsCfgV4 = StaticRewardsCfgV4()
     enable_lidar_temporal_diff: bool = False
 
 
-@configclass
-class Stage1PPOEnvCfg(Stage1EnvCfg):
-    """Stage1EnvCfg with terminal rewards for PPO (RSL-RL does not apply them externally)."""
-    rewards: PPORewardsCfg = PPORewardsCfg()

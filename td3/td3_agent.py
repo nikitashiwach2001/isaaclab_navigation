@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from td3.actor_critic import Actor, ActorGRU, Critic
+from td3.actor_critic import Actor, ActorGRU, Critic, ConvActor, ConvCritic
 
 
 class TD3Agent:
@@ -23,6 +23,7 @@ class TD3Agent:
         noise_clip: float = 0.5,
         policy_delay: int = 2,
         use_gru: bool = False,
+        use_conv: bool = False,
     ):
         self.device = torch.device(device)
 
@@ -35,16 +36,25 @@ class TD3Agent:
         self.noise_clip = noise_clip
         self.policy_delay = policy_delay
         self.use_gru = use_gru
+        self.use_conv = use_conv
+
+        if use_gru and use_conv:
+            raise ValueError("use_gru and use_conv cannot both be True.")
 
         self.total_it = 0
 
         if use_gru:
             self.actor = ActorGRU(state_dim, action_dim, hidden_dim).to(self.device)
+        elif use_conv:
+            self.actor = ConvActor(state_dim, action_dim, hidden_dim).to(self.device)
         else:
             self.actor = Actor(state_dim, action_dim, hidden_dim).to(self.device)
         self.actor_target = copy.deepcopy(self.actor)
 
-        self.critic = Critic(state_dim, action_dim, hidden_dim).to(self.device)
+        if use_conv:
+            self.critic = ConvCritic(state_dim, action_dim, hidden_dim).to(self.device)
+        else:
+            self.critic = Critic(state_dim, action_dim, hidden_dim).to(self.device)
         self.critic_target = copy.deepcopy(self.critic)
 
         if use_gru:
@@ -93,20 +103,14 @@ class TD3Agent:
                 )
             action, self._actor_hidden = self.actor(state, self._actor_hidden)
         else:
-            assert isinstance(self.actor, Actor)
+            assert isinstance(self.actor, (Actor, ConvActor))
             action = self.actor(state)
 
         action = torch.clamp(action, -1.0, 1.0)
         return action
 
-    def train(self, replay_buffer, batch_size: int, freeze_actor: bool = False):
-        """One TD3 training update.
-
-        If freeze_actor=True, only the critic is updated this step. Useful for
-        the warm-up phase after --reset_critic so the critic learns the new
-        reward's Q-landscape under the loaded policy without the actor
-        drifting toward random-Q gradients.
-        """
+    def train(self, replay_buffer, batch_size: int):
+        """One TD3 training update."""
 
         self.total_it += 1
 
@@ -120,7 +124,7 @@ class TD3Agent:
                 assert isinstance(self.actor_target, ActorGRU)
                 next_action, _ = self.actor_target(next_state, hidden=None)
             else:
-                assert isinstance(self.actor_target, Actor)
+                assert isinstance(self.actor_target, (Actor, ConvActor))
                 next_action = self.actor_target(next_state)
             next_action = torch.clamp(next_action + noise, -1.0, 1.0)
 
@@ -144,12 +148,12 @@ class TD3Agent:
 
         self.last_critic_loss = critic_loss.detach()
 
-        if self.total_it % self.policy_delay == 0 and not freeze_actor:
+        if self.total_it % self.policy_delay == 0:
             if self.use_gru:
                 assert isinstance(self.actor, ActorGRU)
                 actor_out, _ = self.actor(state, hidden=None)
             else:
-                assert isinstance(self.actor, Actor)
+                assert isinstance(self.actor, (Actor, ConvActor))
                 actor_out = self.actor(state)
 
             actor_loss = -self.critic.q1_forward(state, actor_out).mean()
@@ -161,7 +165,6 @@ class TD3Agent:
 
             self._soft_update(self.actor_target, self.actor)
             self._soft_update(self.critic_target, self.critic)
-
             self.last_actor_loss = actor_loss.detach()
 
         return {
@@ -186,6 +189,7 @@ class TD3Agent:
                 "critic_optimizer": self.critic_optimizer.state_dict(),
                 "total_it": self.total_it,
                 "use_gru": self.use_gru,
+                "use_conv": self.use_conv,
             },
             path,
         )
@@ -193,8 +197,16 @@ class TD3Agent:
     def load(self, path: str):
         checkpoint = torch.load(path, map_location=self.device)
 
-        # If checkpoint architecture differs (e.g. MLP → GRU), load FC weights only
+        # Architecture must match for full state_dict load. Conv-vs-MLP cannot
+        # share weights (different shapes), so refuse to silently partial-load.
         ckpt_use_gru = checkpoint.get("use_gru", False)
+        ckpt_use_conv = checkpoint.get("use_conv", False)
+        if ckpt_use_conv != self.use_conv:
+            raise RuntimeError(
+                f"Checkpoint use_conv={ckpt_use_conv} but agent use_conv={self.use_conv}. "
+                "Conv and MLP architectures are not weight-compatible."
+            )
+
         strict = (ckpt_use_gru == self.use_gru)
 
         self.actor.load_state_dict(checkpoint["actor"], strict=strict)
@@ -215,6 +227,13 @@ class TD3Agent:
         checkpoint = torch.load(path, map_location=self.device)
 
         ckpt_use_gru = checkpoint.get("use_gru", False)
+        ckpt_use_conv = checkpoint.get("use_conv", False)
+        if ckpt_use_conv != self.use_conv:
+            raise RuntimeError(
+                f"Checkpoint use_conv={ckpt_use_conv} but agent use_conv={self.use_conv}. "
+                "Conv and MLP architectures are not weight-compatible."
+            )
+
         strict = (ckpt_use_gru == self.use_gru)
 
         self.actor.load_state_dict(checkpoint["actor"], strict=strict)
