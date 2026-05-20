@@ -1010,7 +1010,7 @@ def navigation_reward_stage4(env: ManagerBasedRLEnv) -> torch.Tensor:
     clearance_delta = min_obstacle_dist - env.prev_min_obstacle_dist
     env.prev_min_obstacle_dist[:] = min_obstacle_dist
     r_clearance_recovery = torch.where(
-        front_min < 0.50,
+        front_min < 0.65,
         torch.clamp(clearance_delta, -0.03, 0.03) * 80.0,
         torch.zeros_like(goal_dist))
 
@@ -1020,7 +1020,7 @@ def navigation_reward_stage4(env: ManagerBasedRLEnv) -> torch.Tensor:
     no_progress = (torch.abs(progress) < 0.003) & (goal_dist > 0.28) & ~yielding
     # Near obstacles: only penalize when also moving slowly (avoid forcing into walls).
     r_stuck  = torch.where(
-        no_progress & (action_linear < 0.06),
+        no_progress & (action_linear < 0.10),
         torch.full_like(goal_dist, -4.0),
         torch.zeros_like(goal_dist))
     # Open space: penalize any no-progress regardless of action (spinning after dodge).
@@ -1052,7 +1052,7 @@ def navigation_reward_stage4(env: ManagerBasedRLEnv) -> torch.Tensor:
 
     # ── 10. Goal-approach brake ───────────────────────────────────────────────
     r_goal_brake = torch.where(
-        goal_dist < 0.35,
+        goal_dist < 0.28,
         -action_linear * 0.5,
         torch.zeros_like(goal_dist))
 

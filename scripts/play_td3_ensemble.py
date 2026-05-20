@@ -1,4 +1,9 @@
-# scripts/play_td3.py
+# scripts/play_td3_ensemble.py
+#
+# Inference-time ensemble evaluator.
+# Loads multiple TD3 checkpoints and averages their action outputs every step.
+# Use to combine two or three policies that each peak around the same SR
+# but have different per-state failure modes — averaging smooths the failures.
 
 import argparse
 import os
@@ -10,35 +15,34 @@ sys.path.insert(0, PROJECT_ROOT)
 from isaaclab.app import AppLauncher
 
 
-# -------------------------
-# CLI
-# -------------------------
-parser = argparse.ArgumentParser(description="Play/evaluate trained TD3 policy in Isaac Lab.")
+parser = argparse.ArgumentParser(description="Ensemble eval of multiple TD3 policies. Actions are averaged across checkpoints each step.")
 
 parser.add_argument("--task", type=str, required=True)
 parser.add_argument("--num_envs", type=int, default=4)
-parser.add_argument("--checkpoint", type=str, required=True)
+parser.add_argument(
+    "--checkpoints", type=str, nargs="+", required=True,
+    help="One or more checkpoint paths. Actions are averaged uniformly across all provided checkpoints.",
+)
 parser.add_argument("--disable_fabric", action="store_true", default=False)
 parser.add_argument("--hidden_dim", type=int, default=256)
 parser.add_argument("--eval_episodes", type=int, default=100)
-parser.add_argument("--use_gru", action="store_true", default=False, help="Use GRU actor.")
-parser.add_argument("--use_conv", action="store_true", default=False, help="Use 1D conv lidar encoder. Must match the checkpoint's architecture.")
+parser.add_argument("--use_gru", action="store_true", default=False)
+parser.add_argument("--use_conv", action="store_true", default=False)
+parser.add_argument("--seed", type=int, default=0, help="Deterministic eval seed.")
+parser.add_argument(
+    "--mode", type=str, default="mean", choices=["mean", "qselect"],
+    help="mean: average actions across checkpoints. "
+         "qselect: each critic scores every proposed action, pick the best per env.",
+)
 
-# Isaac Lab launcher args
 AppLauncher.add_app_launcher_args(parser)
 args_cli = parser.parse_args()
 
 
-# -------------------------
-# Launch Isaac Sim first
-# -------------------------
 app_launcher = AppLauncher(args_cli)
 simulation_app = app_launcher.app
 
 
-# -------------------------
-# Imports after SimulationApp
-# -------------------------
 import gymnasium as gym
 import numpy as np
 import torch
@@ -60,16 +64,12 @@ def get_env_buffer(env, name: str, num_envs: int, device) -> torch.Tensor:
     )
 
 
-def print_eval_summary(
-    checkpoint: str,
-    episode_count: int,
-    counts: dict,
-):
+def print_eval_summary(label: str, episode_count: int, counts: dict):
     total = max(episode_count, 1)
     pct = lambda n: f"{100.0 * n / total:.2f}%"
 
-    print("\n========== EVALUATION SUMMARY ==========")
-    print(f"Checkpoint: {checkpoint}")
+    print("\n========== ENSEMBLE EVALUATION SUMMARY ==========")
+    print(f"Ensemble: {label}")
     print(f"Total episodes: {episode_count}")
     print(f"SUCCESS:        {counts['success']:<8} ({pct(counts['success'])})")
     print(f"COLL_DYNAMIC:   {counts['coll_dynamic']:<8} ({pct(counts['coll_dynamic'])})")
@@ -78,22 +78,54 @@ def print_eval_summary(
     print(f"TIMEOUT:        {counts['timeout']:<8} ({pct(counts['timeout'])})")
     print(f"TUMBLE:         {counts['tumble']:<8} ({pct(counts['tumble'])})")
     print(f"TERMINATED:     {counts['terminated']:<8} ({pct(counts['terminated'])})")
-    print("========================================\n")
+    print("=================================================\n")
+
+
+def ensemble_select_action(agents, state):
+    """Mean of per-agent actions. Each agent.select_action returns shape (num_envs, action_dim)."""
+    actions = [agent.select_action(state) for agent in agents]
+    stacked = torch.stack(actions, dim=0)  # (K, num_envs, action_dim)
+    mean_action = stacked.mean(dim=0)
+    return torch.clamp(mean_action, -1.0, 1.0)
+
+
+def qselect_action(agents, state):
+    """Q-selection ensemble.
+
+    Each agent proposes an action. Then every agent's critic scores every
+    proposed action. Per env, the action with the best cross-critic score wins.
+
+    Scale handling: critics from different runs have different Q magnitudes.
+    Each critic's scores are mean-centered across the candidate actions (removes
+    per-critic baseline) and divided by that critic's overall Q spread (balances
+    critics with different scales). Then summed across critics."""
+    n = state.shape[0]
+    k = len(agents)
+
+    proposals = torch.stack([agent.select_action(state) for agent in agents], dim=0)  # (K, N, act)
+
+    # scores[critic_j, action_i] = Q_j(state, proposal_i)
+    scores = torch.empty((k, k, n), device=state.device)
+    for j, agent in enumerate(agents):
+        for i in range(k):
+            q = agent.critic.q1_forward(state, proposals[i])
+            scores[j, i] = q.reshape(n)
+
+    centered = scores - scores.mean(dim=1, keepdim=True)               # remove per-critic baseline
+    scale = scores.std(dim=(1, 2), keepdim=True).clamp(min=1e-6)        # per-critic spread
+    total = (centered / scale).sum(dim=0)                              # (K_actions, N)
+
+    best_idx = total.argmax(dim=0)                                     # (N,)
+    chosen = proposals[best_idx, torch.arange(n, device=state.device)] # (N, act)
+    return torch.clamp(chosen, -1.0, 1.0)
 
 
 def main():
     device = args_cli.device
 
-    # Deterministic eval: fix RNG so cylinder phase randomization and goal
-    # selection give the same sequence across runs. Without this, eval-to-eval
-    # SR variance is ±1.5-2% from phase sampling noise alone — masking real
-    # checkpoint differences.
-    torch.manual_seed(1)
-    np.random.seed(0)
+    torch.manual_seed(args_cli.seed)
+    np.random.seed(args_cli.seed)
 
-    # -------------------------
-    # Env config
-    # -------------------------
     env_cfg = parse_env_cfg(
         args_cli.task,
         device=device,
@@ -117,42 +149,35 @@ def main():
     state_dim = state.shape[1]
     action_dim = env.action_space.shape[1]
 
-    # Observation layout (284 dims):
-    #   0  – 269 : lidar_stacked (90×3)       (270)
-    #   270– 277 : lidar_temporal_sector_diff  (8)
-    #   278      : goal distance               (1)
-    #   279      : goal angle                  (1)
-    #   280– 281 : robot_velocity              (2)
-    #   282– 283 : previous actions            (2)
-    GOAL_DIST_IDX  = 270 + 8          # 278
-    GOAL_ANGLE_IDX = 270 + 8 + 1      # 279
-    MAX_GOAL_DIST  = 7.07106781187   # sqrt(5² + 5²)
+    GOAL_DIST_IDX  = 270 + 8
+    GOAL_ANGLE_IDX = 270 + 8 + 1
+    MAX_GOAL_DIST  = 7.07106781187
 
     # -------------------------
-    # TD3 Agent
+    # Load every checkpoint into its own TD3Agent
     # -------------------------
-    agent = TD3Agent(
-        state_dim=state_dim,
-        action_dim=action_dim,
-        device=device,
-        hidden_dim=args_cli.hidden_dim,
-        use_gru=args_cli.use_gru,
-        use_conv=args_cli.use_conv,
-    )
+    agents = []
+    for ckpt_path in args_cli.checkpoints:
+        agent = TD3Agent(
+            state_dim=state_dim,
+            action_dim=action_dim,
+            device=device,
+            hidden_dim=args_cli.hidden_dim,
+            use_gru=args_cli.use_gru,
+            use_conv=args_cli.use_conv,
+        )
+        agent.load(ckpt_path)
+        agent.actor.eval()
+        agent.critic.eval()
+        agents.append(agent)
+        print(f"[INFO] Loaded checkpoint: {ckpt_path}")
 
-    agent.load(args_cli.checkpoint)
-    agent.actor.eval()
+    print(f"[INFO] Ensemble size: {len(agents)}  mode: {args_cli.mode}")
+    print(f"[INFO] state_dim: {state_dim}  action_dim: {action_dim}  hidden_dim: {args_cli.hidden_dim}")
+    print(f"[INFO] num_envs: {num_envs}  eval_episodes: {args_cli.eval_episodes}  seed: {args_cli.seed}")
 
-    print("[INFO] Loaded checkpoint:", args_cli.checkpoint)
-    print("[INFO] state_dim:", state_dim)
-    print("[INFO] action_dim:", action_dim)
-    print("[INFO] hidden_dim:", args_cli.hidden_dim)
-    print("[INFO] num_envs:", num_envs)
-    print("[INFO] eval_episodes:", args_cli.eval_episodes)
+    ensemble_label = " + ".join(os.path.basename(os.path.dirname(p)) + "/" + os.path.basename(p) for p in args_cli.checkpoints)
 
-    # -------------------------
-    # Evaluation buffers
-    # -------------------------
     episode_reward_sum = torch.zeros(num_envs, device=device)
     episode_step_count = torch.zeros(num_envs, dtype=torch.long, device=device)
 
@@ -172,12 +197,12 @@ def main():
     from collections import defaultdict
     per_goal_counts = defaultdict(lambda: defaultdict(int))
 
-    # -------------------------
-    # Play / Evaluate loop
-    # -------------------------
     while simulation_app.is_running():
         with torch.inference_mode():
-            action = agent.select_action(state)
+            if args_cli.mode == "qselect":
+                action = qselect_action(agents, state)
+            else:
+                action = ensemble_select_action(agents, state)
 
             obs, reward, terminated, truncated, _ = env.step(action)
             state = obs["policy"]
@@ -190,7 +215,8 @@ def main():
 
             if done.any():
                 done_env_ids = torch.where(done)[0]
-                agent.reset_hidden(done_env_ids)
+                for agent in agents:
+                    agent.reset_hidden(done_env_ids)
 
                 goal_reached_buf       = get_env_buffer(env, "goal_reached_buf",       num_envs, device)
                 collision_buf          = get_env_buffer(env, "collision_buf",           num_envs, device)
@@ -216,7 +242,6 @@ def main():
                     gy = round(goal_local[env_id, 1].item(), 1)
                     goal_key = (gx, gy)
 
-                    # Priority: goal_reached > collision > tumble > timeout
                     if goal_reached_buf[env_id]:
                         outcome = "SUCCESS"
                         counts["success"] += 1
@@ -259,11 +284,7 @@ def main():
                     episode_step_count[env_id] = 0
 
                     if episode_count >= args_cli.eval_episodes:
-                        print_eval_summary(
-                            checkpoint=args_cli.checkpoint,
-                            episode_count=episode_count,
-                            counts=counts,
-                        )
+                        print_eval_summary(ensemble_label, episode_count, counts)
 
                         print("\n========== PER-GOAL BREAKDOWN ==========")
                         print(f"{'goal (x,y)':<14} {'N':>4} {'SR':>7} {'STATIC':>7} {'DYN':>5} {'TIMEOUT':>8}")

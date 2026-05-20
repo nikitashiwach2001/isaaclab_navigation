@@ -179,6 +179,12 @@ def randomize_goal_positions_stage4(env: ManagerBasedRLEnv, env_ids: torch.Tenso
         idx = torch.randint(len(positions), (num_reset_envs,), device=env.device)
         random_xy_local = positions[idx]
         too_close = torch.norm(random_xy_local - robot_xy_local, dim=-1) < MIN_START_GOAL_DIST
+        for obs_name in _STAGE_OBSTACLE_NAMES:
+            if obs_name not in env.scene.keys():
+                continue
+            obs_xy_w = env.scene[obs_name].data.root_pos_w[env_ids, :2]
+            obs_xy_local = obs_xy_w - env_origins_xy
+            too_close = too_close | (torch.norm(random_xy_local - obs_xy_local, dim=-1) < OBSTACLE_CLEARANCE)
         if not too_close.any():
             break
 

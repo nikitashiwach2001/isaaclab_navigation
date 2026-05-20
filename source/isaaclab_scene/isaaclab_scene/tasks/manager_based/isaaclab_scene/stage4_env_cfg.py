@@ -10,6 +10,7 @@ from .mdp.stage_4.obstacles import (
     STAGE4_OBSTACLE_1_CFG,
     STAGE4_OBSTACLE_2_CFG,
     update_moving_obstacles_stage4,
+    randomize_obstacle_phases_stage4,
 )
 
 
@@ -83,6 +84,11 @@ class Stage31EventsCfg(BaseEventsCfg):
 
 @configclass
 class Stage4EventsCfg(BaseEventsCfg):
+    randomize_obstacle_phases = EventTerm(
+        func=randomize_obstacle_phases_stage4,
+        mode="reset",
+    )
+
     reset_goal_position = EventTerm(
         func=mdp.randomize_goal_positions_stage4,
         mode="reset",

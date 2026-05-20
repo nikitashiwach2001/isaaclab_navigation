@@ -113,21 +113,59 @@ def _interp_keyframes(
 # ── Per-step update ───────────────────────────────────────────────────────────
 
 def update_moving_obstacles_stage4(env, _env_ids=None):
-    """Advance both keyframe obstacles. Each env starts at a random phase."""
+    """Advance both keyframe obstacles. Phase is re-randomized per-episode by
+    randomize_obstacle_phases_stage4; this function just ticks the clocks
+    forward and interpolates positions."""
 
     dt = env.step_dt
 
     if not hasattr(env, "s4_obs1_time"):
-        # Random initial phase so parallel envs are not synchronised
         env.s4_obs1_time = torch.rand(env.num_envs, device=env.device) * _OBS1_PERIOD
         env.s4_obs2_time = torch.rand(env.num_envs, device=env.device) * _OBS2_PERIOD
-
 
     env.s4_obs1_time = (env.s4_obs1_time + dt) % _OBS1_PERIOD
     env.s4_obs2_time = (env.s4_obs2_time + dt) % _OBS2_PERIOD
 
     _move_obstacle(env, "obstacle_1", env.s4_obs1_time, _OBS1_TIMES, _OBS1_XY)
     _move_obstacle(env, "obstacle_2", env.s4_obs2_time, _OBS2_TIMES, _OBS2_XY)
+
+
+def randomize_obstacle_phases_stage4(env, env_ids=None):
+    """Re-randomize cylinder phases at episode reset.
+
+    Without this, each cylinder's clock just drifts deterministically — the
+    replay buffer over-samples some (goal × phase) pairs and under-samples
+    others, capping policy performance on the rare ones. Calling this at every
+    reset gives uniform phase coverage across episodes.
+
+    Run order matters: this must run BEFORE reset_goal_position so the goal
+    selector sees the new obstacle positions and can reject goals that landed
+    under a cylinder."""
+    if env_ids is None:
+        env_ids = torch.arange(env.num_envs, device=env.device)
+    env_ids = env_ids.to(dtype=torch.long, device=env.device)
+    n = len(env_ids)
+
+    if not hasattr(env, "s4_obs1_time"):
+        env.s4_obs1_time = torch.zeros(env.num_envs, device=env.device)
+        env.s4_obs2_time = torch.zeros(env.num_envs, device=env.device)
+
+    env.s4_obs1_time[env_ids] = torch.rand(n, device=env.device) * _OBS1_PERIOD
+    env.s4_obs2_time[env_ids] = torch.rand(n, device=env.device) * _OBS2_PERIOD
+
+    for name, t, times, xy in (
+        ("obstacle_1", env.s4_obs1_time, _OBS1_TIMES, _OBS1_XY),
+        ("obstacle_2", env.s4_obs2_time, _OBS2_TIMES, _OBS2_XY),
+    ):
+        obs = env.scene[name]
+        xy_local = _interp_keyframes(t[env_ids], times, xy, env.device)
+        pos = torch.zeros((n, 3), device=env.device)
+        pos[:, :2] = env.scene.env_origins[env_ids, :2] + xy_local
+        pos[:, 2] = 0.25
+        quat = obs.data.root_quat_w[env_ids].clone()
+        pose = torch.cat([pos, quat], dim=-1)
+        obs.write_root_pose_to_sim(pose, env_ids=env_ids)
+        obs.write_root_velocity_to_sim(torch.zeros((n, 6), device=env.device), env_ids=env_ids)
 
 
 def _move_obstacle(env, name: str, time: torch.Tensor, times: list, xy: list):
