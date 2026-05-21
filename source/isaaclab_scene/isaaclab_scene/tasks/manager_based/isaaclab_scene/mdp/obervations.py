@@ -261,6 +261,36 @@ def previous_actions(env: ManagerBasedRLEnv) -> torch.Tensor:
     return action
 
 
+_N_PRIV_OBSTACLES = 3   # Stage 5 has three cylinders; Stage 4 (two) zero-pads the extra slot
+_PRIV_POS_NORM = 5.0    # keeps relative position roughly in [-1, 1]
+_PRIV_VEL_NORM = 1.0    # cylinder speeds are well under 1 m/s
+
+
+def privileged_obstacle_state(env: ManagerBasedRLEnv) -> torch.Tensor:
+    """Critic-only privileged observation: per-cylinder relative position and
+    relative velocity.
+
+    Shape: [num_envs, _N_PRIV_OBSTACLES * 4], zero-padded if fewer cylinders.
+
+    For asymmetric actor-critic — given to the CRITIC only. The deployed actor
+    never sees this; it stays lidar-only. Lets the critic compute exact
+    collision risk so it gives the lidar actor a clean learning signal.
+    """
+    robot = env.scene["robot"]
+    robot_xy  = robot.data.root_pos_w[:, :2]
+    robot_vel = robot.data.root_lin_vel_w[:, :2]
+
+    out = torch.zeros((env.num_envs, _N_PRIV_OBSTACLES * 4), device=env.device)
+    obs_keys = sorted(k for k in env.scene.keys() if k.startswith("obstacle_"))
+    for i, okey in enumerate(obs_keys[:_N_PRIV_OBSTACLES]):
+        cyl = env.scene[okey]
+        rel_pos = (cyl.data.root_pos_w[:, :2] - robot_xy) / _PRIV_POS_NORM
+        rel_vel = (cyl.data.root_lin_vel_w[:, :2] - robot_vel) / _PRIV_VEL_NORM
+        out[:, i * 4 + 0:i * 4 + 2] = torch.clamp(rel_pos, -1.0, 1.0)
+        out[:, i * 4 + 2:i * 4 + 4] = torch.clamp(rel_vel, -1.0, 1.0)
+    return out
+
+
 _MAX_LIN_VEL = 0.22   # matches actions.py
 _MAX_ANG_VEL = 2.0    # matches actions.py
 
@@ -299,4 +329,16 @@ class ObservationsCfg:
             self.enable_corruption = False
             self.concatenate_terms = True
 
+    @configclass
+    class PrivilegedCfg(ObsGroup):
+        """Critic-only privileged observation (asymmetric actor-critic).
+        Consumed only by the critic during training — the deployed actor
+        stays lidar-only and never reads this group."""
+        obstacle_state = ObsTerm(func=privileged_obstacle_state)   # [12] up to 3 cylinders × (rel_pos, rel_vel)
+
+        def __post_init__(self):
+            self.enable_corruption = False
+            self.concatenate_terms = True
+
     policy: PolicyCfg = PolicyCfg()
+    privileged: PrivilegedCfg = PrivilegedCfg()

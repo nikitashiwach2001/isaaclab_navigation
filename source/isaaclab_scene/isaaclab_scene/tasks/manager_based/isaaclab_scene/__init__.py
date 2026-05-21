@@ -68,6 +68,39 @@ gym.register(
     },
 )
 
+# Stage 4 random-spawn — freeze-fix variant: robot starts at a random arena
+# position each episode. Same scene/reward as Stage4-v0; only the spawn differs.
+gym.register(
+    id="IsaaclabScene-Stage4-RandSpawn-v0",
+    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    disable_env_checker=True,
+    kwargs={
+        "env_cfg_entry_point": f"{__name__}.stage4_env_cfg:Stage4RandSpawnEnvCfg",
+    },
+)
+
+# Stage 4 mixed-spawn — ~50% fixed-origin, ~50% random spawn per episode.
+# Combines fixed-spawn cylinder-timing sharpness with random-spawn robustness.
+gym.register(
+    id="IsaaclabScene-Stage4-MixedSpawn-v0",
+    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    disable_env_checker=True,
+    kwargs={
+        "env_cfg_entry_point": f"{__name__}.stage4_env_cfg:Stage4MixedSpawnEnvCfg",
+    },
+)
+
+# Stage 4 three-pillar — Stage 4 + a third moving pillar (simple slow motion).
+# Generalization test: does the policy avoid an obstacle it never trained on?
+gym.register(
+    id="IsaaclabScene-Stage4-ThreePillar-v0",
+    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    disable_env_checker=True,
+    kwargs={
+        "env_cfg_entry_point": f"{__name__}.stage4_env_cfg:Stage4ThreePillarEnvCfg",
+    },
+)
+
 # Stage 4 PPO — same scene, but env rewards include terminal bonus/penalty for RSL-RL
 # gym.register(
 #     id="IsaaclabScene-Stage4-PPO-v0",
@@ -87,6 +120,17 @@ gym.register(
     kwargs={
         "env_cfg_entry_point": f"{__name__}.stage5_env_cfg:Stage5EnvCfg",
         # "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:Stage5PPORunnerCfg",
+    },
+)
+
+# Stage 5 mixed-spawn — ~50% fixed-origin, ~50% random spawn per episode.
+# Finetune target for the random-spawn Stage 4 checkpoint.
+gym.register(
+    id="IsaaclabScene-Stage5-MixedSpawn-v0",
+    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    disable_env_checker=True,
+    kwargs={
+        "env_cfg_entry_point": f"{__name__}.stage5_env_cfg:Stage5MixedSpawnEnvCfg",
     },
 )
 

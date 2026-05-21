@@ -1,3 +1,5 @@
+import torch
+
 import isaaclab.sim as sim_utils
 from isaaclab.assets import RigidObjectCfg
 from isaaclab.managers import EventTermCfg as EventTerm
@@ -6,11 +8,13 @@ from isaaclab.utils import configclass
 from . import mdp
 
 from .isaaclab_scene_env_cfg import BaseSceneCfg, BaseEventsCfg, BaseEnvCfg
+from .mdp.rewards import Stage4RewardsCfgV2
 from .mdp.stage_5.obstacles import (
     STAGE5_OBSTACLE_1_CFG,
     STAGE5_OBSTACLE_2_CFG,
     STAGE5_OBSTACLE_3_CFG,
     update_moving_obstacles_stage5,
+    randomize_obstacle_phases_stage5,
 )
 from .mdp.stage_5.robot import LIDAR_CFG_5
 
@@ -52,6 +56,12 @@ class Stage5SceneCfg(BaseSceneCfg):
 @configclass
 class Stage5EventsCfg(BaseEventsCfg):
 
+    # Runs before reset_goal_position so the goal selector sees new obstacle positions
+    randomize_obstacle_phases = EventTerm(
+        func=randomize_obstacle_phases_stage5,
+        mode="reset",
+    )
+
     reset_goal_position = EventTerm(
         func=mdp.randomize_goal_positions_stage4,
         mode="reset",
@@ -70,6 +80,51 @@ class Stage5EnvCfg(BaseEnvCfg):
 
     scene: Stage5SceneCfg = Stage5SceneCfg()
     events: Stage5EventsCfg = Stage5EventsCfg()
+    rewards: Stage4RewardsCfgV2 = Stage4RewardsCfgV2()
     enable_lidar_temporal_diff: bool = True
+
+
+_MIXED_SPAWN_RANDOM_FRAC = 0.5   # fraction of episodes that get a random spawn
+
+
+def reset_stage5_mixedspawn(env, env_ids=None):
+    """Combined Stage 5 reset, mixed spawn. Per episode, per env: ~50% start at
+    a random arena position, ~50% stay at the fixed origin. Order: obstacle
+    phases -> robot spawn -> goal (goal selector needs the new obstacle positions)."""
+    randomize_obstacle_phases_stage5(env, env_ids)
+    if env_ids is None:
+        env_ids = torch.arange(env.num_envs, device=env.device)
+    rand_mask = torch.rand(len(env_ids), device=env.device) < _MIXED_SPAWN_RANDOM_FRAC
+    rand_ids = env_ids[rand_mask]
+    if len(rand_ids) > 0:
+        mdp.randomize_robot_positions(env, rand_ids)
+    mdp.randomize_goal_positions_stage4(env, env_ids)
+
+
+@configclass
+class Stage5MixedSpawnEventsCfg(BaseEventsCfg):
+    """Stage 5 events with mixed (50% fixed / 50% random) robot spawn.
+    Base reset_robot_position runs first, then reset_goal_position runs the
+    combined obstacle + mixed-robot + goal reset."""
+
+    reset_goal_position = EventTerm(
+        func=reset_stage5_mixedspawn,
+        mode="reset",
+    )
+
+    move_obstacles = EventTerm(
+        func=update_moving_obstacles_stage5,
+        mode="interval",
+        interval_range_s=(0.01, 0.01),
+    )
+
+
+@configclass
+class Stage5MixedSpawnEnvCfg(Stage5EnvCfg):
+    """Stage 5, mixed robot spawn — ~50% fixed-origin, ~50% random per episode.
+    Inherits Stage5EnvCfg's scene and Stage4RewardsCfgV2 reward; only the spawn
+    differs. The finetune target for the random-spawn Stage 4 checkpoint."""
+
+    events: Stage5MixedSpawnEventsCfg = Stage5MixedSpawnEventsCfg()
 
 

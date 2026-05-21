@@ -24,11 +24,16 @@ class TD3Agent:
         policy_delay: int = 2,
         use_gru: bool = False,
         use_conv: bool = False,
+        priv_dim: int = 0,
     ):
         self.device = torch.device(device)
 
         self.state_dim = state_dim
         self.action_dim = action_dim
+        # Asymmetric actor-critic: the critic sees state + privileged obs,
+        # the actor sees state only. priv_dim=0 → symmetric (normal TD3).
+        self.priv_dim = priv_dim
+        self.critic_state_dim = state_dim + priv_dim
 
         self.gamma = gamma
         self.tau = tau
@@ -52,9 +57,9 @@ class TD3Agent:
         self.actor_target = copy.deepcopy(self.actor)
 
         if use_conv:
-            self.critic = ConvCritic(state_dim, action_dim, hidden_dim).to(self.device)
+            self.critic = ConvCritic(self.critic_state_dim, action_dim, hidden_dim).to(self.device)
         else:
-            self.critic = Critic(state_dim, action_dim, hidden_dim).to(self.device)
+            self.critic = Critic(self.critic_state_dim, action_dim, hidden_dim).to(self.device)
         self.critic_target = copy.deepcopy(self.critic)
 
         if use_gru:
@@ -114,7 +119,12 @@ class TD3Agent:
 
         self.total_it += 1
 
-        state, action, reward, next_state, done = replay_buffer.sample(batch_size)
+        state, action, reward, next_state, done, priv_state, priv_next_state = replay_buffer.sample(batch_size)
+
+        # Critic sees state + privileged obs; actor sees state only.
+        # priv tensors are width-0 when priv_dim=0 → cat is a no-op (symmetric TD3).
+        critic_state      = torch.cat([state, priv_state], dim=1)
+        critic_next_state = torch.cat([next_state, priv_next_state], dim=1)
 
         with torch.no_grad():
             noise = torch.randn_like(action) * self.policy_noise
@@ -128,12 +138,12 @@ class TD3Agent:
                 next_action = self.actor_target(next_state)
             next_action = torch.clamp(next_action + noise, -1.0, 1.0)
 
-            target_q1, target_q2 = self.critic_target(next_state, next_action)
+            target_q1, target_q2 = self.critic_target(critic_next_state, next_action)
             target_q = torch.min(target_q1, target_q2)
 
             target_q = reward + (1.0 - done) * self.gamma * target_q
 
-        current_q1, current_q2 = self.critic(state, action)
+        current_q1, current_q2 = self.critic(critic_state, action)
 
         # Huber loss (delta=20): quadratic for |error|<20, linear above.
         # Prevents spike when a batch contains many terminal collision events (-200 reward)
@@ -156,7 +166,7 @@ class TD3Agent:
                 assert isinstance(self.actor, (Actor, ConvActor))
                 actor_out = self.actor(state)
 
-            actor_loss = -self.critic.q1_forward(state, actor_out).mean()
+            actor_loss = -self.critic.q1_forward(critic_state, actor_out).mean()
 
             self.actor_optimizer.zero_grad()
             actor_loss.backward()
@@ -190,6 +200,7 @@ class TD3Agent:
                 "total_it": self.total_it,
                 "use_gru": self.use_gru,
                 "use_conv": self.use_conv,
+                "priv_dim": self.priv_dim,
             },
             path,
         )

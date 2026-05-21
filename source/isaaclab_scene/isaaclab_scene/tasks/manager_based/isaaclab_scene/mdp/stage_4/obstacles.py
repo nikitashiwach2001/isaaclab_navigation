@@ -32,6 +32,22 @@ STAGE4_OBSTACLE_2_CFG = RigidObjectCfg(
     init_state=RigidObjectCfg.InitialStateCfg(pos=(-2.0, -2.0, 0.25), rot=(1.0, 0.0, 0.0, 0.0)),
 )
 
+# Obstacle 3 — test-only third pillar (blue). Simple predictable motion in
+# right-side free space, clear of the robot spawn. Used by the
+# Stage4-ThreePillar generalization test.
+STAGE4_OBSTACLE_3_CFG = RigidObjectCfg(
+    prim_path="{ENV_REGEX_NS}/Obstacle_3",
+    spawn=sim_utils.CylinderCfg(
+        radius=0.16, height=0.50, axis="Z",
+        rigid_props=sim_utils.RigidBodyPropertiesCfg(kinematic_enabled=True,
+                                                     disable_gravity=True),
+        mass_props=sim_utils.MassPropertiesCfg(mass=1.0),
+        collision_props=sim_utils.CollisionPropertiesCfg(),
+        visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.1, 0.3, 0.9)),
+    ),
+    init_state=RigidObjectCfg.InitialStateCfg(pos=(1.2, -0.4, 0.25), rot=(1.0, 0.0, 0.0, 0.0)),
+)
+
 
 # ── Keyframe tables (local arena coordinates) ─────────────────────────────────
 #
@@ -74,6 +90,19 @@ _OBS2_XY = [
 ]
 _OBS2_PERIOD = 130.0 * OBSTACLE_SPEED_SCALE
 
+# Obstacle 3 — test-only. Simple vertical oscillation at x=1.2 (right-side free
+# space, clear of the robot spawn at the origin). 70 s base period over a 3.6 m
+# loop ≈ 0.051 m/s — about half the speed of obstacle_1/2 (~0.09-0.13 m/s).
+# Deliberately easy and unlike obstacle_1/2 — a generalization test.
+_OBS3_TIMES_BASE = [0.0, 35.0, 70.0]
+_OBS3_TIMES = [t * OBSTACLE_SPEED_SCALE for t in _OBS3_TIMES_BASE]
+_OBS3_XY = [
+    [1.2, -0.4],   # 0 s   — bottom
+    [1.2,  1.4],   # 35 s  — sweep up
+    [1.2, -0.4],   # 70 s  — back down, loop
+]
+_OBS3_PERIOD = 70.0 * OBSTACLE_SPEED_SCALE
+
 
 # ── Interpolation helper ──────────────────────────────────────────────────────
 
@@ -113,21 +142,29 @@ def _interp_keyframes(
 # ── Per-step update ───────────────────────────────────────────────────────────
 
 def update_moving_obstacles_stage4(env, _env_ids=None):
-    """Advance both keyframe obstacles. Phase is re-randomized per-episode by
+    """Advance the keyframe obstacles. Phase is re-randomized per-episode by
     randomize_obstacle_phases_stage4; this function just ticks the clocks
-    forward and interpolates positions."""
+    forward and interpolates positions. obstacle_3 is moved only if present
+    in the scene (the Stage4-ThreePillar test variant)."""
 
     dt = env.step_dt
+    has_obs3 = "obstacle_3" in env.scene.keys()
 
     if not hasattr(env, "s4_obs1_time"):
         env.s4_obs1_time = torch.rand(env.num_envs, device=env.device) * _OBS1_PERIOD
         env.s4_obs2_time = torch.rand(env.num_envs, device=env.device) * _OBS2_PERIOD
+    if has_obs3 and not hasattr(env, "s4_obs3_time"):
+        env.s4_obs3_time = torch.rand(env.num_envs, device=env.device) * _OBS3_PERIOD
 
     env.s4_obs1_time = (env.s4_obs1_time + dt) % _OBS1_PERIOD
     env.s4_obs2_time = (env.s4_obs2_time + dt) % _OBS2_PERIOD
 
     _move_obstacle(env, "obstacle_1", env.s4_obs1_time, _OBS1_TIMES, _OBS1_XY)
     _move_obstacle(env, "obstacle_2", env.s4_obs2_time, _OBS2_TIMES, _OBS2_XY)
+
+    if has_obs3:
+        env.s4_obs3_time = (env.s4_obs3_time + dt) % _OBS3_PERIOD
+        _move_obstacle(env, "obstacle_3", env.s4_obs3_time, _OBS3_TIMES, _OBS3_XY)
 
 
 def randomize_obstacle_phases_stage4(env, env_ids=None):
@@ -140,23 +177,41 @@ def randomize_obstacle_phases_stage4(env, env_ids=None):
 
     Run order matters: this must run BEFORE reset_goal_position so the goal
     selector sees the new obstacle positions and can reject goals that landed
-    under a cylinder."""
+    under a cylinder.
+
+    Toggle: set env var STAGE4_OBSTACLE_PHASE_RESET=0 to disable per-episode
+    re-randomization. Obstacles then drift continuously across episodes (the
+    pre-2026-05-19 behavior) — for A/B testing the reset. update_moving_obstacles
+    still ticks the clocks, so motion continues; only the per-reset teleport is
+    skipped."""
+    if os.environ.get("STAGE4_OBSTACLE_PHASE_RESET", "1") != "1":
+        return
+
     if env_ids is None:
         env_ids = torch.arange(env.num_envs, device=env.device)
     env_ids = env_ids.to(dtype=torch.long, device=env.device)
     n = len(env_ids)
 
+    has_obs3 = "obstacle_3" in env.scene.keys()
+
     if not hasattr(env, "s4_obs1_time"):
         env.s4_obs1_time = torch.zeros(env.num_envs, device=env.device)
         env.s4_obs2_time = torch.zeros(env.num_envs, device=env.device)
+    if has_obs3 and not hasattr(env, "s4_obs3_time"):
+        env.s4_obs3_time = torch.zeros(env.num_envs, device=env.device)
 
     env.s4_obs1_time[env_ids] = torch.rand(n, device=env.device) * _OBS1_PERIOD
     env.s4_obs2_time[env_ids] = torch.rand(n, device=env.device) * _OBS2_PERIOD
+    if has_obs3:
+        env.s4_obs3_time[env_ids] = torch.rand(n, device=env.device) * _OBS3_PERIOD
 
-    for name, t, times, xy in (
+    triples = [
         ("obstacle_1", env.s4_obs1_time, _OBS1_TIMES, _OBS1_XY),
         ("obstacle_2", env.s4_obs2_time, _OBS2_TIMES, _OBS2_XY),
-    ):
+    ]
+    if has_obs3:
+        triples.append(("obstacle_3", env.s4_obs3_time, _OBS3_TIMES, _OBS3_XY))
+    for name, t, times, xy in triples:
         obs = env.scene[name]
         xy_local = _interp_keyframes(t[env_ids], times, xy, env.device)
         pos = torch.zeros((n, 3), device=env.device)

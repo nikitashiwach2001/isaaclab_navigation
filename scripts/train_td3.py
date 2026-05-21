@@ -45,6 +45,7 @@ parser.add_argument("--load_checkpoint", type=str, default=None, help="Path to T
 parser.add_argument("--reset_critic", action="store_true", default=False, help="Load actor weights only; re-init critic fresh. Use when reward scale changes between runs.")
 parser.add_argument("--use_gru", action="store_true", default=False, help="Use GRU actor for temporal memory.")
 parser.add_argument("--use_conv", action="store_true", default=False, help="Use 1D conv lidar encoder (ConvActor/ConvCritic). Not weight-compatible with MLP checkpoints.")
+parser.add_argument("--privileged_critic", action="store_true", default=False, help="Asymmetric actor-critic: the critic also reads the env's 'privileged' obs group (cylinder pos/vel). The actor stays lidar-only and is deployable unchanged.")
 
 AppLauncher.add_app_launcher_args(parser)
 args_cli = parser.parse_args()
@@ -213,6 +214,10 @@ def main():
     obs, _ = env.reset()
     state = obs["policy"]
 
+    use_priv = args_cli.privileged_critic
+    priv_state = obs["privileged"] if use_priv else None
+    priv_dim = priv_state.shape[1] if use_priv else 0
+
     num_envs = env.unwrapped.num_envs
     state_dim = state.shape[1]
     action_dim = env.action_space.shape[1]
@@ -234,6 +239,7 @@ def main():
     logger(f"[INFO] policy_delay: {args_cli.policy_delay}  tau: {args_cli.tau}  expl_noise: {args_cli.expl_noise}")
     logger(f"[INFO] batch_size:   {args_cli.batch_size}  buffer_size: {args_cli.buffer_size}  total_steps: {args_cli.total_steps}")
     logger(f"[INFO] use_conv:    {args_cli.use_conv}  use_gru: {args_cli.use_gru}")
+    logger(f"[INFO] privileged_critic: {use_priv}  priv_dim: {priv_dim}")
 
     agent = TD3Agent(
         state_dim=state_dim,
@@ -249,6 +255,7 @@ def main():
         policy_delay=args_cli.policy_delay,
         use_gru=args_cli.use_gru,
         use_conv=args_cli.use_conv,
+        priv_dim=priv_dim,
     )
 
     if args_cli.load_checkpoint is not None:
@@ -272,6 +279,7 @@ def main():
         action_dim=action_dim,
         max_size=args_cli.buffer_size,
         device=device,
+        priv_dim=priv_dim,
     )
 
     ou_noise = OUNoise(
@@ -346,6 +354,7 @@ def main():
         with torch.inference_mode():
             next_obs, reward, terminated, truncated, info = env.step(action)
             next_state = next_obs["policy"]
+            next_priv = next_obs["privileged"] if use_priv else None
             done = terminated | truncated
 
         goal_reached_buf = get_env_buffer(env, "goal_reached_buf", num_envs, device)
@@ -377,6 +386,8 @@ def main():
             rewards=reward,
             next_states=next_state,
             dones=terminated,
+            priv_states=priv_state,
+            priv_next_states=next_priv,
         )
 
         episode_reward_sum += reward
@@ -463,6 +474,8 @@ def main():
                 episode_step_count[env_id] = 0
 
         state = next_state
+        if use_priv:
+            priv_state = next_priv
         global_step += num_envs
 
         if len(replay_buffer) >= args_cli.batch_size and global_step >= args_cli.start_steps:

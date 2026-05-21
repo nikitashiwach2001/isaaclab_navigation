@@ -10,9 +10,13 @@ class ReplayBuffer:
         action_dim: int,
         max_size: int,
         device: str | torch.device,
+        priv_dim: int = 0,
     ):
         self.max_size = int(max_size)
         self.device = torch.device(device)
+        # Privileged obs for asymmetric actor-critic. priv_dim=0 → buffers are
+        # width-0, sample() returns empty priv slices, downstream cat is a no-op.
+        self.priv_dim = int(priv_dim)
 
         self.ptr = 0
         self.size = 0
@@ -22,6 +26,8 @@ class ReplayBuffer:
         self.rewards = torch.zeros((self.max_size, 1), dtype=torch.float32, device=self.device)
         self.next_states = torch.zeros((self.max_size, state_dim), dtype=torch.float32, device=self.device)
         self.dones = torch.zeros((self.max_size, 1), dtype=torch.float32, device=self.device)
+        self.priv_states = torch.zeros((self.max_size, self.priv_dim), dtype=torch.float32, device=self.device)
+        self.priv_next_states = torch.zeros((self.max_size, self.priv_dim), dtype=torch.float32, device=self.device)
 
     def add(
         self,
@@ -30,6 +36,8 @@ class ReplayBuffer:
         rewards: torch.Tensor,
         next_states: torch.Tensor,
         dones: torch.Tensor,
+        priv_states: torch.Tensor | None = None,
+        priv_next_states: torch.Tensor | None = None,
     ):
         """Add a batch of transitions from vectorized envs.
 
@@ -39,6 +47,7 @@ class ReplayBuffer:
             rewards:     [num_envs]
             next_states: [num_envs, state_dim]
             dones:       [num_envs]
+            priv_states / priv_next_states: [num_envs, priv_dim] (required if priv_dim > 0)
         """
 
         states = states.detach()
@@ -56,6 +65,9 @@ class ReplayBuffer:
         self.rewards[indices] = rewards
         self.next_states[indices] = next_states
         self.dones[indices] = dones
+        if self.priv_dim > 0:
+            self.priv_states[indices] = priv_states.detach()
+            self.priv_next_states[indices] = priv_next_states.detach()
 
         self.ptr = (self.ptr + batch_size) % self.max_size
         self.size = min(self.size + batch_size, self.max_size)
@@ -74,6 +86,8 @@ class ReplayBuffer:
             self.rewards[indices],
             self.next_states[indices],
             self.dones[indices],
+            self.priv_states[indices],
+            self.priv_next_states[indices],
         )
 
     def __len__(self):

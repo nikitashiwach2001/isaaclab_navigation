@@ -88,7 +88,7 @@ def main():
     # selection give the same sequence across runs. Without this, eval-to-eval
     # SR variance is ±1.5-2% from phase sampling noise alone — masking real
     # checkpoint differences.
-    torch.manual_seed(1)
+    torch.manual_seed(0)
     np.random.seed(0)
 
     # -------------------------
@@ -140,7 +140,10 @@ def main():
         use_conv=args_cli.use_conv,
     )
 
-    agent.load(args_cli.checkpoint)
+    # Actor-only load: eval runs the lidar-only actor. Skipping the critic
+    # makes this work for both normal (554-critic) and asymmetric-actor-critic
+    # (562-critic privileged) checkpoints — the critic is never used at eval.
+    agent.load_actor_only(args_cli.checkpoint)
     agent.actor.eval()
 
     print("[INFO] Loaded checkpoint:", args_cli.checkpoint)

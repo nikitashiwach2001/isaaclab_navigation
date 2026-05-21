@@ -1050,3 +1050,540 @@ goal (x,y)        N      SR  STATIC   DYN  TIMEOUT
 (-2.0,-0.8)   121   92.6%    0.8%  5.0%     1.7%
 (-1.5, 2.0)   117   93.2%    0.0%  5.1%     1.7%
 ( 2.0, 1.5)    99   93.9%    0.0%  3.0%     3.0%
+
+
+seed 1, and 2 (scale 3.0)
+Checkpoint: logs/may_20/stage4_v2_scale3/20260520_035017/td3_step_2000128.pt
+Total episodes: 1500
+SUCCESS:        1383     (92.20%)
+COLL_DYNAMIC:   69       (4.60%)
+COLL_STATIC:    4        (0.27%)
+COLL_BOUNDARY:  1        (0.07%)
+TIMEOUT:        43       (2.87%)
+
+Checkpoint: logs/may_20/stage4_v2_scale3/20260520_035017/td3_step_2000128.pt
+Total episodes: 1500
+SUCCESS:        1395     (93.00%)
+COLL_DYNAMIC:   46       (3.07%)
+COLL_STATIC:    5        (0.33%)
+COLL_BOUNDARY:  2        (0.13%)
+TIMEOUT:        52       (3.47%)
+TUMBLE:         0        (0.00%)
+TERMINATED:     0        (0.00%)
+
+
+seed 0, 1, 2 (scale 2.0)
+Checkpoint: logs/may_20/stage4_v2_scale3/20260520_035017/td3_step_2000128.pt
+Total episodes: 1500
+SUCCESS:        1383     (92.20%)
+COLL_DYNAMIC:   78       (5.20%)
+COLL_STATIC:    8        (0.53%)
+COLL_BOUNDARY:  1        (0.07%)
+TIMEOUT:        30       (2.00%)
+TUMBLE:         0        (0.00%)
+TERMINATED:     0        (0.00%)
+
+Checkpoint: logs/may_20/stage4_v2_scale3/20260520_035017/td3_step_2000128.pt
+Total episodes: 1500
+SUCCESS:        1383     (92.20%)
+COLL_DYNAMIC:   78       (5.20%)
+COLL_STATIC:    8        (0.53%)
+COLL_BOUNDARY:  1        (0.07%)
+TIMEOUT:        30       (2.00%)
+TUMBLE:         0        (0.00%)
+TERMINATED:     0        (0.00%)
+
+Checkpoint: logs/may_20/stage4_v2_scale3/20260520_035017/td3_step_2000128.pt
+Total episodes: 1500
+SUCCESS:        1407     (93.80%)
+COLL_DYNAMIC:   55       (3.67%)
+COLL_STATIC:    7        (0.47%)
+COLL_BOUNDARY:  0        (0.00%)
+TIMEOUT:        31       (2.07%)
+TUMBLE:         0        (0.00%)
+TERMINATED:     0        (0.00%)
+
+
+
+[INFO] Loaded logs/may_20/stage4_v2_scale3/20260520_035017/td3_step_2000128.pt  seed=0
+[INFO] freeze_speed=0.05  freeze_steps=15
+
+========== FREEZE DIAGNOSTIC ==========
+Checkpoint: logs/may_20/stage4_v2_scale3/20260520_035017/td3_step_2000128.pt
+Episodes: 1500   Freeze events: 470
+CSV written: logs/may_20/stage4_v2_scale3/20260520_035017/freeze_events.csv
+  froze near a wall (<0.6m):         123  (26.2%)
+  froze near a cylinder (<0.8m):     214  (45.5%)
+   ...of which cylinder RECEDING:     57  (path clearing — should NOT freeze)
+  froze in open space:               185  (39.4%)
+  froze near goal (<0.5m):            15  (3.2%)
+  freeze episode outcomes: {'COLL_DYNAMIC': 196, 'SUCCESS': 153, 'COLL_STATIC': 24, 'TIMEOUT': 97}
+=======================================
+
+
+seed 2, 1, 0
+Checkpoint: logs/may_20/stage4_v2_scale1/20260520_045753/td3_step_500224.pt
+Total episodes: 1500
+SUCCESS:        1362     (90.80%)
+COLL_DYNAMIC:   95       (6.33%)
+COLL_STATIC:    9        (0.60%)
+COLL_BOUNDARY:  3        (0.20%)
+TIMEOUT:        31       (2.07%)
+
+goal (x,y)        N      SR  STATIC   DYN  TIMEOUT
+(-1.0,-2.0)   111   84.7%    1.8%  9.9%     3.6%
+( 2.0, 1.5)   128   85.2%    0.8% 11.7%     2.3%
+( 1.5,-1.8)   110   88.2%    0.9%  8.2%     2.7%
+(-2.0, 0.8)   121   89.3%    0.8%  7.4%     1.7%
+( 1.8,-0.5)    95   90.5%    0.0%  7.4%     1.1%
+( 0.5, 1.5)   133   91.0%    0.0%  6.8%     2.3%
+(-2.0,-0.8)   120   91.7%    0.8%  3.3%     4.2%
+(-1.5, 2.0)   101   92.1%    1.0%  5.0%     2.0%
+( 1.5, 0.8)   114   92.1%    0.9%  6.1%     0.9%
+(-2.0, 1.8)   119   92.4%    0.8%  5.9%     0.8%
+( 0.0, 2.0)   119   92.4%    0.0%  4.2%     2.5%
+( 2.0,-1.5)   109   95.4%    0.0%  2.8%     1.8%
+( 0.5,-2.0)   120   95.8%    0.0%  3.3%     0.8%
+
+Checkpoint: logs/may_20/stage4_v2_scale1/20260520_045753/td3_step_500224.pt
+Total episodes: 1500
+SUCCESS:        1337     (89.13%)
+COLL_DYNAMIC:   121      (8.07%)
+COLL_STATIC:    8        (0.53%)
+COLL_BOUNDARY:  1        (0.07%)
+TIMEOUT:        33       (2.20%)
+
+Checkpoint: logs/may_20/stage4_v2_scale1/20260520_045753/td3_step_500224.pt
+Total episodes: 1500
+SUCCESS:        1331     (88.73%)
+COLL_DYNAMIC:   116      (7.73%)
+COLL_STATIC:    6        (0.40%)
+COLL_BOUNDARY:  5        (0.33%)
+TIMEOUT:        42       (2.80%)
+TUMBLE:         0        (0.00%)
+TERMINATED:     0        (0.00%)
+========================================
+
+
+ ================================================================================
+ ================================================================================
+ BEST ON SCALE 1.0
+
+seed 2, 1, 0 respectively
+Checkpoint: logs/may_20/stage4_v2_scale1/20260520_045753/td3_step_1000192.pt
+Total episodes: 1500
+SUCCESS:        1352     (90.13%)
+COLL_DYNAMIC:   73       (4.87%)
+COLL_STATIC:    17       (1.13%)
+COLL_BOUNDARY:  4        (0.27%)
+TIMEOUT:        54       (3.60%)
+
+Checkpoint: logs/may_20/stage4_v2_scale1/20260520_045753/td3_step_1000192.pt
+Total episodes: 1500
+SUCCESS:        1352     (90.13%)
+COLL_DYNAMIC:   85       (5.67%)
+COLL_STATIC:    19       (1.27%)
+COLL_BOUNDARY:  9        (0.60%)
+TIMEOUT:        35       (2.33%)
+
+Checkpoint: logs/may_20/stage4_v2_scale1/20260520_045753/td3_step_1000192.pt
+Total episodes: 1500
+SUCCESS:        1342     (89.47%)
+COLL_DYNAMIC:   80       (5.33%)
+COLL_STATIC:    21       (1.40%)
+COLL_BOUNDARY:  12       (0.80%)
+TIMEOUT:        45       (3.00%)
+
+freeze summary
+[INFO] Loaded logs/may_20/stage4_v2_scale1/20260520_045753/td3_step_1000192.pt  seed=1
+[INFO] freeze_speed=0.05  freeze_steps=15
+
+========== FREEZE DIAGNOSTIC ==========
+Checkpoint: logs/may_20/stage4_v2_scale1/20260520_045753/td3_step_1000192.pt
+Episodes: 1500   Freeze events: 212
+CSV written: logs/may_20/stage4_v2_scale1/20260520_045753/freeze_events.csv
+  froze near a wall (<0.6m):          22  (10.4%)
+  froze near a cylinder (<0.8m):     149  (70.3%)
+   ...of which cylinder RECEDING:     36  (path clearing — should NOT freeze)
+  froze in open space:                59  (27.8%)
+  froze near goal (<0.5m):             5  (2.4%)
+  freeze episode outcomes: {'COLL_DYNAMIC': 88, 'SUCCESS': 82, 'COLL_BOUNDARY': 8, 'TIMEOUT': 28, 'COLL_STATIC': 6}
+
+[INFO] Loaded logs/may_20/stage4_v2_scale1/20260520_045753/td3_step_1000192.pt  seed=0
+[INFO] freeze_speed=0.05  freeze_steps=15
+
+========== FREEZE DIAGNOSTIC ==========
+Checkpoint: logs/may_20/stage4_v2_scale1/20260520_045753/td3_step_1000192.pt
+Episodes: 1500   Freeze events: 222
+CSV written: logs/may_20/stage4_v2_scale1/20260520_045753/freeze_events.csv
+  froze near a wall (<0.6m):          14  (6.3%)
+  froze near a cylinder (<0.8m):     131  (59.0%)
+   ...of which cylinder RECEDING:     42  (path clearing — should NOT freeze)
+  froze in open space:                88  (39.6%)
+  froze near goal (<0.5m):            11  (5.0%)
+  freeze episode outcomes: {'COLL_DYNAMIC': 67, 'SUCCESS': 91, 'COLL_BOUNDARY': 6, 'TIMEOUT': 54, 'COLL_STATIC': 4}
+=======================================
+
+========== FREEZE DIAGNOSTIC ==========
+Checkpoint: logs/may_20/stage4_v2_scale1/20260520_045753/td3_step_1000192.pt
+Episodes: 1500   Freeze events: 203
+CSV written: logs/may_20/stage4_v2_scale1/20260520_045753/freeze_events.csv
+  froze near a wall (<0.6m):          22  (10.8%)
+  froze near a cylinder (<0.8m):     137  (67.5%)
+   ...of which cylinder RECEDING:     39  (path clearing — should NOT freeze)
+  froze in open space:                64  (31.5%)
+  froze near goal (<0.5m):             5  (2.5%)
+  freeze episode outcomes: {'COLL_DYNAMIC': 65, 'SUCCESS': 75, 'COLL_STATIC': 13, 'TIMEOUT': 42, 'COLL_BOUNDARY': 8}
+=======================================
+
+
+after previlaged changes
+seed 0
+Checkpoint: logs/may_20/stage4_asym_critic/20260520_063241/td3_step_1500160.pt
+Total episodes: 1500
+SUCCESS:        1394     (92.93%)
+COLL_DYNAMIC:   79       (5.27%)
+COLL_STATIC:    3        (0.20%)
+COLL_BOUNDARY:  1        (0.07%)
+TIMEOUT:        23       (1.53%)
+
+seed 1
+Checkpoint: logs/may_20/stage4_asym_critic/20260520_063241/td3_step_1500160.pt
+Total episodes: 1500
+SUCCESS:        1384     (92.27%)
+COLL_DYNAMIC:   89       (5.93%)
+COLL_STATIC:    1        (0.07%)
+COLL_BOUNDARY:  1        (0.07%)
+TIMEOUT:        25       (1.67%)
+
+seed 2
+Checkpoint: logs/may_20/stage4_asym_critic/20260520_063241/td3_step_1500160.pt
+Total episodes: 1500
+SUCCESS:        1382     (92.13%)
+COLL_DYNAMIC:   81       (5.40%)
+COLL_STATIC:    5        (0.33%)
+COLL_BOUNDARY:  4        (0.27%)
+TIMEOUT:        28       (1.87%)
+
+==========================================================================
+
+seed 0
+Checkpoint: logs/may_20/stage4_asym_critic/20260520_063241/td3_step_2000128.pt
+Total episodes: 1500
+SUCCESS:        1395     (93.00%)
+COLL_DYNAMIC:   48       (3.20%)
+COLL_STATIC:    24       (1.60%)
+TIMEOUT:        33       (2.20%)
+
+Episodes: 1500   Freeze events: 367
+CSV written: logs/may_20/stage4_asym_critic/20260520_063241/freeze_events.csv
+  froze near a wall (<0.6m):          80  (21.8%)
+  froze near a cylinder (<0.8m):      62  (16.9%)
+   ...of which cylinder RECEDING:     31  (path clearing — should NOT freeze)
+  froze in open space:               248  (67.6%)
+  froze near goal (<0.5m):             5  (1.4%)
+  freeze episode outcomes: {'COLL_STATIC': 105, 'SUCCESS': 132, 'COLL_DYNAMIC': 30, 'TIMEOUT': 96, 'COLL_BOUNDARY': 4}
+
+seed 1
+Checkpoint: logs/may_20/stage4_asym_critic/20260520_063241/td3_step_2000128.pt
+Total episodes: 1500
+SUCCESS:        1391     (92.73%)
+COLL_DYNAMIC:   66       (4.40%)
+COLL_STATIC:    20       (1.33%)
+TIMEOUT:        23       (1.53%)
+
+Episodes: 1500   Freeze events: 430
+CSV written: logs/may_20/stage4_asym_critic/20260520_063241/freeze_events.csv
+  froze near a wall (<0.6m):          71  (16.5%)
+  froze near a cylinder (<0.8m):      85  (19.8%)
+   ...of which cylinder RECEDING:     44  (path clearing — should NOT freeze)
+  froze in open space:               290  (67.4%)
+  froze near goal (<0.5m):            11  (2.6%)
+  freeze episode outcomes: {'COLL_DYNAMIC': 51, 'SUCCESS': 186, 'COLL_STATIC': 99, 'TIMEOUT': 85, 'COLL_BOUNDARY': 9}
+
+seed 2
+Checkpoint: logs/may_20/stage4_asym_critic/20260520_063241/td3_step_2000128.pt
+Total episodes: 1500
+SUCCESS:        1402     (93.47%)
+COLL_DYNAMIC:   53       (3.53%)
+COLL_STATIC:    24       (1.60%)
+COLL_BOUNDARY:  2        (0.13%)
+TIMEOUT:        19       (1.27%)
+
+[INFO] freeze_speed=0.05  freeze_steps=15
+
+========== FREEZE DIAGNOSTIC ==========
+Checkpoint: logs/may_20/stage4_asym_critic/20260520_063241/td3_step_2000128.pt
+Episodes: 1500   Freeze events: 307
+CSV written: logs/may_20/stage4_asym_critic/20260520_063241/freeze_events.csv
+  froze near a wall (<0.6m):          69  (22.5%)
+  froze near a cylinder (<0.8m):      74  (24.1%)
+   ...of which cylinder RECEDING:     35  (path clearing — should NOT freeze)
+  froze in open space:               193  (62.9%)
+  froze near goal (<0.5m):            16  (5.2%)
+  freeze episode outcomes: {'SUCCESS': 124, 'COLL_DYNAMIC': 56, 'COLL_STATIC': 45, 'TIMEOUT': 81, 'COLL_BOUNDARY': 1}
+
+
+
+==========================================================================
+
+seed 0
+Checkpoint: logs/may_20/stage4_asym_critic/20260520_063241/td3_final.pt
+Total episodes: 1500
+SUCCESS:        1395     (93.00%)
+COLL_DYNAMIC:   48       (3.20%)
+COLL_STATIC:    24       (1.60%)
+TIMEOUT:        33       (2.20%)
+
+seed 1
+Checkpoint: logs/may_20/stage4_asym_critic/20260520_063241/td3_final.pt
+Total episodes: 1500
+SUCCESS:        1388     (92.53%)
+COLL_DYNAMIC:   61       (4.07%)
+COLL_STATIC:    22       (1.47%)
+TIMEOUT:        29       (1.93%)
+
+seed 2
+Checkpoint: logs/may_20/stage4_asym_critic/20260520_063241/td3_final.pt
+Total episodes: 1500
+SUCCESS:        1402     (93.47%)
+COLL_DYNAMIC:   53       (3.53%)
+COLL_STATIC:    24       (1.60%)
+COLL_BOUNDARY:  2        (0.13%)
+TIMEOUT:        19       (1.27%)
+
+===============================================================================
+===============================================================================
+===============================================================================
+
+seed 1
+Checkpoint: logs/may_20/stage4_asym_critic_ext/20260520_072611/td3_final.pt
+Total episodes: 1500
+SUCCESS:        1415     (94.33%)
+COLL_DYNAMIC:   30       (2.00%)
+COLL_STATIC:    27       (1.80%)
+COLL_BOUNDARY:  1        (0.07%)
+TIMEOUT:        27       (1.80%)
+
+Episodes: 1500   Freeze events: 244
+CSV written: logs/may_20/stage4_asym_critic_ext/20260520_072611/freeze_events.csv
+  froze near a wall (<0.6m):          68  (27.9%)
+  froze near a cylinder (<0.8m):      74  (30.3%)
+   ...of which cylinder RECEDING:     62  (path clearing — should NOT freeze)
+  froze in open space:               121  (49.6%)
+  froze near goal (<0.5m):             0  (0.0%)
+  --- freeze type (linear stalled) ---
+  SPINNING (turning in place):       167  (68.4%)  — reorienting, cosmetically slow
+  STOPPED  (no turn, no move):        77  (31.6%)  — genuine freeze
+  freeze episode outcomes: {'SUCCESS': 138, 'COLL_DYNAMIC': 7, 'TIMEOUT': 77, 'COLL_STATIC': 22}
+
+seed 0
+Checkpoint: logs/may_20/stage4_asym_critic_ext/20260520_072611/td3_final.pt
+Total episodes: 1500
+SUCCESS:        1413     (94.20%)
+COLL_DYNAMIC:   23       (1.53%)
+COLL_STATIC:    38       (2.53%)
+TIMEOUT:        26       (1.73%)
+
+Episodes: 1500   Freeze events: 205
+CSV written: logs/may_20/stage4_asym_critic_ext/20260520_072611/freeze_events.csv
+  froze near a wall (<0.6m):          35  (17.1%)
+  froze near a cylinder (<0.8m):      75  (36.6%)
+   ...of which cylinder RECEDING:     54  (path clearing — should NOT freeze)
+  froze in open space:               108  (52.7%)
+  froze near goal (<0.5m):             0  (0.0%)
+  --- freeze type (linear stalled) ---
+  SPINNING (turning in place):       167  (81.5%)  — reorienting, cosmetically slow
+  STOPPED  (no turn, no move):        38  (18.5%)  — genuine freeze
+  freeze episode outcomes: {'SUCCESS': 137, 'COLL_DYNAMIC': 14, 'COLL_STATIC': 14, 'TIMEOUT': 40}
+
+seed 2
+Checkpoint: logs/may_20/stage4_asym_critic_ext/20260520_072611/td3_final.pt
+Total episodes: 1500
+SUCCESS:        1419     (94.60%)
+COLL_DYNAMIC:   34       (2.27%)
+COLL_STATIC:    32       (2.13%)
+COLL_BOUNDARY:  1        (0.07%)
+TIMEOUT:        14       (0.93%)
+
+Episodes: 1500   Freeze events: 190
+CSV written: logs/may_20/stage4_asym_critic_ext/20260520_072611/freeze_events.csv
+  froze near a wall (<0.6m):          35  (18.4%)
+  froze near a cylinder (<0.8m):      79  (41.6%)
+   ...of which cylinder RECEDING:     66  (path clearing — should NOT freeze)
+  froze in open space:                90  (47.4%)
+  froze near goal (<0.5m):             0  (0.0%)
+  --- freeze type (linear stalled) ---
+  SPINNING (turning in place):       147  (77.4%)  — reorienting, cosmetically slow
+  STOPPED  (no turn, no move):        43  (22.6%)  — genuine freeze
+  freeze episode outcomes: {'SUCCESS': 107, 'COLL_DYNAMIC': 18, 'TIMEOUT': 58, 'COLL_BOUNDARY': 1, 'COLL_STATIC': 6}
+
+
+best checkpoint in entire project
+OBSTACLE_SPEED_SCALE=1.0 python scripts/play_td3.py   /
+--task IsaaclabScene-Stage4-v0   --num_envs 256   /
+--hidden_dim 512   --use_conv   --eval_episodes 1500   /
+--checkpoint logs/may_20/stage4_asym_critic_ext/20260520_072611/td3_final.pt /
+--headless
+
+OBSTACLE_SPEED_SCALE=1.0 python scripts/play_td3.py  --task IsaaclabScene-Stage4-v0   --num_envs 1 --hidden_dim 512   --use_conv   --eval_episodes 1500  --checkpoint logs/may_20/stage4_asym_critic_ext/20260520_072611/td3_final.pt
+
+*************************************************************************************
+*************************************************************************************
+*************************************************************************************
+
+Checkpoint: logs/may_20/stage4_randspawn_ext/20260520_082131/td3_step_3500032.pt
+Total episodes: 1500
+SUCCESS:        1360     (90.67%)
+COLL_DYNAMIC:   51       (3.40%)
+COLL_STATIC:    22       (1.47%)
+TIMEOUT:        67       (4.47%)
+
+OBSTACLE_SPEED_SCALE=1.0 python scripts/play_td3_freezelog.py \
+  --task IsaaclabScene-Stage4-v0 --num_envs 128 --hidden_dim 512 --use_conv \
+  --eval_episodes 1500 --seed 0 \
+  --checkpoint logs/may_20/stage4_randspawn_ext/20260520_082131/td3_step_3500032.pt
+
+seed 0
+Checkpoint: logs/may_20/stage4_randspawn_ext/20260520_082131/td3_step_3500032.pt
+Total episodes: 1500
+SUCCESS:        1421     (94.73%)
+COLL_DYNAMIC:   47       (3.13%)
+COLL_STATIC:    22       (1.47%)
+COLL_BOUNDARY:  0        (0.00%)
+TIMEOUT:        10       (0.67%)
+
+seed 1
+Checkpoint: logs/may_20/stage4_randspawn_ext/20260520_082131/td3_step_3500032.pt
+Total episodes: 1500
+SUCCESS:        1420     (94.67%)
+COLL_DYNAMIC:   62       (4.13%)
+COLL_STATIC:    8        (0.53%)
+COLL_BOUNDARY:  2        (0.13%)
+TIMEOUT:        8        (0.53%)
+
+seed 2
+Checkpoint: logs/may_20/stage4_randspawn_ext/20260520_082131/td3_step_3500032.pt
+Total episodes: 1500
+SUCCESS:        1423     (94.87%)
+COLL_DYNAMIC:   45       (3.00%)
+COLL_STATIC:    15       (1.00%)
+COLL_BOUNDARY:  1        (0.07%)
+TIMEOUT:        16       (1.07%)
+
+================================================================================
+================================================================================
+================================================================================
+
+Checkpoint: logs/may_20/stage4_mixedspawn/20260520_094950/td3_step_2500096.pt**
+Total episodes: 1500
+SUCCESS:        1418     (94.53%)
+COLL_DYNAMIC:   25       (1.67%)
+COLL_STATIC:    28       (1.87%)
+TIMEOUT:        29       (1.93%)
+
+Checkpoint: logs/may_20/stage4_mixedspawn/20260520_094950/td3_step_3000064.pt
+Total episodes: 1500
+SUCCESS:        1421     (94.73%)
+COLL_DYNAMIC:   51       (3.40%)
+COLL_STATIC:    7        (0.47%)
+TIMEOUT:        21       (1.40%)
+
+Checkpoint: logs/may_20/stage4_mixedspawn/20260520_094950/td3_final.pt
+Total episodes: 1500
+SUCCESS:        1421     (94.73%)
+COLL_DYNAMIC:   51       (3.40%)
+COLL_STATIC:    7        (0.47%)
+TIMEOUT:        21       (1.40%)
+
+---------------------------------------------------------------------------
+Checkpoint: logs/may_20/stage4_v3_collfix/20260520_105713/td3_final.pt
+Total episodes: 1500
+SUCCESS:        1380     (92.00%)
+COLL_DYNAMIC:   13       (0.87%)
+COLL_STATIC:    29       (1.93%)
+COLL_BOUNDARY:  1        (0.07%)
+TIMEOUT:        77       (5.13%)
+_________________________________________________________________________________________
+----------------------------------------------------------------------------------------|                                                                                        |  
+this policy has the best perfomamce till date**                                         |
+seed 0                                                                                  |  
+Checkpoint: logs/may_20/stage4_randspawn_ext/20260520_082131/td3_step_3500032.pt        |
+Total episodes: 1500                                                                    |
+SUCCESS:        1421     (94.73%)                                                       |
+COLL_DYNAMIC:   47       (3.13%)                                                        |
+COLL_STATIC:    22       (1.47%)                                                        |
+TIMEOUT:        10       (0.67%)                                                        |
+                                                                                        |    
+seed 1                                                                                  |
+Checkpoint: logs/may_20/stage4_randspawn_ext/20260520_082131/td3_step_3500032.pt        |
+Total episodes: 1500                                                                    |
+SUCCESS:        1420     (94.67%)                                                       |  
+COLL_DYNAMIC:   62       (4.13%)                                                        |        
+COLL_STATIC:    8        (0.53%)                                                        |    
+COLL_BOUNDARY:  2        (0.13%)                                                        |
+TIMEOUT:        8        (0.53%)                                                        |
+                                                                                        |    
+seed 2                                                                                  |        
+Checkpoint: logs/may_20/stage4_randspawn_ext/20260520_082131/td3_step_3500032.pt        |
+Total episodes: 1500                                                                    |  
+SUCCESS:        1423     (94.87%)                                                       |
+COLL_DYNAMIC:   45       (3.00%)                                                        |
+COLL_STATIC:    15       (1.00%)                                                        | 
+COLL_BOUNDARY:  1        (0.07%)                                                        |
+TIMEOUT:        16       (1.07%)                                                        |
+                                                                                        |
+----------------------------------------------------------------------------------------|                                                                                        |
+----------------------------------------------------------------------------------------|
+
+----------------------------------------------------------------------------------------|
+----------------------------------------------------------------------------------------|
+Checkpoint: logs/may_20/stage4_mixedspawn/20260520_094950/td3_step_3000064.pt*
+Total episodes: 1500
+SUCCESS:        1421     (94.73%)
+COLL_DYNAMIC:   51       (3.40%)
+COLL_STATIC:    7        (0.47%)
+TIMEOUT:        21       (1.40%)
+
+Checkpoint: logs/may_20/stage4_mixedspawn/20260520_094950/td3_final.pt*
+Total episodes: 1500
+SUCCESS:        1421     (94.73%)
+COLL_DYNAMIC:   51       (3.40%)
+COLL_STATIC:    7        (0.47%)
+TIMEOUT:        21       (1.40%)
+----------------------------------------------------------------------------------------|
+----------------------------------------------------------------------------------------|
+
+=========================================================================================
+========================== STAGE 5 ======================================================
+
+++++++++++++++++++++++++++++++++++++++ SCALE 2.0 +++++++++++++++++++++++++++++++++++++++++++++++++++
+
+Seed 0
+Checkpoint: logs/may_21/stage5_mixedspawn_finetune_ext/20260521_061213/td3_step_9500032.pt
+Total episodes: 1500
+SUCCESS:        1466     (97.73%)
+COLL_DYNAMIC:   12       (0.80%)
+COLL_STATIC:    2        (0.13%)
+TIMEOUT:        20       (1.33%)
+
+Checkpoint: logs/may_21/stage5_mixedspawn_finetune_ext/20260521_061213/td3_step_11500032.pt
+Total episodes: 1500
+SUCCESS:        1451     (96.73%)
+COLL_DYNAMIC:   12       (0.80%)
+COLL_STATIC:    23       (1.53%)
+TIMEOUT:        14       (0.93%)
+
+
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+++++++++++++++++++++++++++++++++++++++ SCALE 1.0 +++++++++++++++++++++++++++++++++++++++++++++++++++
+
+Checkpoint: logs/may_21/stage5_mixedspawn_scale1/20260521_072312/td3_step_3500032.pt**
+Total episodes: 1500
+SUCCESS:        1434     (95.60%)
+COLL_DYNAMIC:   22       (1.47%)
+COLL_STATIC:    38       (2.53%)
+COLL_BOUNDARY:  1        (0.07%)
+TIMEOUT:        5        (0.33%)
+
+

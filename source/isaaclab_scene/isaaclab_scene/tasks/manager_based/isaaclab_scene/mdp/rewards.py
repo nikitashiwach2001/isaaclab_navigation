@@ -1071,3 +1071,336 @@ def navigation_reward(env: ManagerBasedRLEnv) -> torch.Tensor:
 class RewardsCfg:
     navigation = RewTerm(func=navigation_reward, weight=1.0)
 
+
+def navigation_reward_stage4_v2(env: ManagerBasedRLEnv) -> torch.Tensor:
+    """Stage 4 reward v2 — freeze fix + sim-truth cylinder collision-course penalty.
+
+    Differences vs navigation_reward_stage4:
+      - r_goal_brake removed (it penalized motion near goal — a freeze flat-spot)
+      - r_vlinear no longer zeroed near goal (freezing now costs the speed penalty)
+      - r_cylinder_closing added: strong early penalty for being on a collision
+        course with a moving cylinder, from exact sim cylinder pos+velocity.
+    """
+    min_obstacle_dist, front_min, right_min, left_min = _get_lidar_distances(env)
+    goal_dist, goal_angle = _get_goal_distance_and_angle(env)
+    action_linear, action_angular = _get_real_actions(env)
+    _ensure_stage3_buffers(env, goal_dist, min_obstacle_dist)
+
+    temporal_diff  = _get_lidar_temporal_sector_diff_reward(env)
+    front_temporal = temporal_diff[:, 0]
+    left_temporal  = torch.minimum(temporal_diff[:, 1], temporal_diff[:, 2])
+    right_temporal = torch.minimum(temporal_diff[:, 6], temporal_diff[:, 7])
+
+    CLOSING_THRESH    = -0.0001
+    robot_fwd         = env.scene["robot"].data.root_lin_vel_b[:, 0]
+    robot_front_diff  = robot_fwd * env.step_dt / LIDAR_DISTANCE_CAP
+    front_closing = (front_temporal + robot_front_diff) < CLOSING_THRESH
+    left_closing  = left_temporal  < CLOSING_THRESH
+    right_closing = right_temporal < CLOSING_THRESH
+
+    front_blocked = front_min < 0.40
+    side_tight    = (left_min < 0.35) | (right_min < 0.35)
+
+    front_dynamic_risk = (front_min < 0.50) & front_closing
+    left_dynamic_risk  = (left_min  < 0.40) & left_closing
+    right_dynamic_risk = (right_min < 0.40) & right_closing
+    front_early_risk   = (front_min < 0.75) & front_closing
+
+    dynamic_blocked = front_dynamic_risk | left_dynamic_risk | right_dynamic_risk | front_early_risk
+    tight_space     = front_blocked | side_tight | dynamic_blocked
+    detour_needed   = front_blocked | front_dynamic_risk | left_dynamic_risk | right_dynamic_risk
+
+    # ── 1. Yaw ────────────────────────────────────────────────────────────────
+    near_goal_heading  = goal_dist < 0.40
+    corner_trapped     = front_blocked & side_tight
+    has_escape_room    = (left_min > 0.40) | (right_min > 0.40)
+    open_dodge_active  = front_early_risk & has_escape_room & ~near_goal_heading
+    static_wall_detour = front_blocked & ~front_closing & has_escape_room & ~near_goal_heading
+    r_yaw = torch.where(
+        static_wall_detour, -0.20 * torch.abs(goal_angle),
+        torch.where(open_dodge_active,  -0.40 * torch.abs(goal_angle),
+        torch.where(corner_trapped, -4.00 * torch.abs(goal_angle),
+        torch.where(near_goal_heading & ~detour_needed, -4.00 * torch.abs(goal_angle),
+        torch.where(detour_needed, -1.50 * torch.abs(goal_angle),
+                    -2.00 * torch.abs(goal_angle))))))
+
+    # ── 2. Angular penalty ────────────────────────────────────────────────────
+    misaligned  = torch.abs(goal_angle) > 0.5
+    r_vangular  = torch.where(misaligned, -0.10 * (action_angular ** 2),
+                  torch.where(detour_needed, -0.50 * (action_angular ** 2),
+                              -1.00 * (action_angular ** 2)))
+
+    # ── 3. Goal progress (potential-based, always active — no freeze flat-spot) ─
+    progress   = env.goal_dist_prev - goal_dist
+    r_distance = progress * 60.0
+    env.goal_dist_prev[:] = goal_dist
+
+    # ── 4. Obstacle soft + hard penalty ───────────────────────────────────────
+    safe_dist       = 0.65
+    terminal_dist   = 0.30
+    r_obstacle_soft = -6.0 * torch.clamp(
+        (safe_dist - min_obstacle_dist) / (safe_dist - terminal_dist), 0.0, 1.0) ** 2
+    r_obstacle_hard = torch.where(
+        min_obstacle_dist < terminal_dist,
+        torch.full_like(min_obstacle_dist, -20.0),
+        torch.zeros_like(min_obstacle_dist))
+    r_obstacle = r_obstacle_soft + r_obstacle_hard
+
+    # ── 5. Linear speed — freeze fix: NOT zeroed near goal, so freezing costs ──
+    r_vlinear_open = -(((MAX_LINEAR_SPEED - action_linear) * 10.0) ** 2)
+    r_vlinear      = torch.where(tight_space, 0.50 * r_vlinear_open, r_vlinear_open)
+
+    # ── 6. Front push penalty ─────────────────────────────────────────────────
+    r_front_push = torch.where(
+        (front_min < 0.35) & (action_linear > 0.08),
+        torch.full_like(goal_dist, -2.0),
+        torch.zeros_like(goal_dist))
+
+    # ── 7. Clearance recovery ─────────────────────────────────────────────────
+    clearance_delta = min_obstacle_dist - env.prev_min_obstacle_dist
+    env.prev_min_obstacle_dist[:] = min_obstacle_dist
+    r_clearance_recovery = torch.where(
+        front_min < 0.65,
+        torch.clamp(clearance_delta, -0.03, 0.03) * 80.0,
+        torch.zeros_like(goal_dist))
+
+    # ── 8. Anti-stuck ─────────────────────────────────────────────────────────
+    genuinely_trapped = ~((left_min > 0.40) | (right_min > 0.40))
+    yielding = (front_dynamic_risk & genuinely_trapped) | left_dynamic_risk | right_dynamic_risk
+    no_progress = (torch.abs(progress) < 0.003) & (goal_dist > 0.28) & ~yielding
+    r_stuck  = torch.where(
+        no_progress & (action_linear < 0.10),
+        torch.full_like(goal_dist, -4.0),
+        torch.zeros_like(goal_dist))
+    r_open_stuck = torch.where(
+        no_progress & (min_obstacle_dist > 0.50),
+        torch.full_like(goal_dist, -3.0),
+        torch.zeros_like(goal_dist))
+
+    # ── 9. Front / static dodge ───────────────────────────────────────────────
+    open_side_turn = torch.where(
+        left_min > right_min,
+        torch.clamp(action_angular,  0.0, 1.0),
+        torch.clamp(-action_angular, 0.0, 1.0))
+    r_front_dodge = torch.where(
+        front_early_risk & has_escape_room & ~near_goal_heading,
+        open_side_turn * 0.30,
+        torch.zeros_like(goal_dist))
+    static_wall_blocked = front_blocked & ~front_closing & has_escape_room & ~near_goal_heading
+    r_static_dodge = torch.where(
+        static_wall_blocked,
+        open_side_turn * 0.50,
+        torch.zeros_like(goal_dist))
+
+    # ── 10. Cylinder collision-course penalty (sim ground-truth) ──────────────
+    # Exact cylinder pos+velocity from the simulator — perfect dynamic/static
+    # split, no lidar inference. Fires early when the robot is on a collision
+    # course so it curves away before contact instead of reacting at the last step.
+    robot_xy  = env.scene["robot"].data.root_pos_w[:, :2]
+    robot_vel = env.scene["robot"].data.root_lin_vel_w[:, :2]
+    DANGER_DIST = 1.0
+    r_cylinder_closing = torch.zeros_like(goal_dist)
+    for okey in [k for k in env.scene.keys() if k.startswith("obstacle_")]:
+        cyl     = env.scene[okey]
+        cyl_xy  = cyl.data.root_pos_w[:, :2]
+        cyl_vel = cyl.data.root_lin_vel_w[:, :2]
+        vec       = cyl_xy - robot_xy
+        dist      = torch.norm(vec, dim=-1).clamp(min=1e-6)
+        direction = vec / dist.unsqueeze(-1)
+        rel_vel   = robot_vel - cyl_vel
+        closing_speed = (rel_vel * direction).sum(dim=-1)   # >0 = robot closing on cylinder
+        proximity = torch.clamp((DANGER_DIST - dist) / DANGER_DIST, 0.0, 1.0)
+        on_course = (dist < DANGER_DIST) & (closing_speed > 0.0)
+        penalty = torch.where(
+            on_course,
+            -closing_speed.clamp(min=0.0) * proximity * 15.0,
+            torch.zeros_like(goal_dist))
+        r_cylinder_closing = torch.minimum(r_cylinder_closing, penalty)
+
+    reward = (
+        r_yaw + r_distance + r_obstacle + r_vlinear + r_vangular
+        + r_front_push + r_clearance_recovery + r_stuck + r_open_stuck
+        + r_front_dodge + r_static_dodge + r_cylinder_closing
+        - 1.0
+    )
+    return reward
+
+
+@configclass
+class Stage4RewardsCfgV2:
+    navigation = RewTerm(func=navigation_reward_stage4_v2, weight=1.0)
+
+
+def navigation_reward_stage4_v3(env: ManagerBasedRLEnv) -> torch.Tensor:
+    """Stage 4 reward v3 — v2 plus two diagnostic-driven collision fixes.
+
+    Collision-logger findings on the mixed-spawn policy:
+      - 100% of static collisions were side-wall clips while moving fast, and
+        v2 only had a FRONT push penalty. v3 adds r_side_push (left/right).
+      - 68% of dynamic collisions were slow creeps into a cylinder; v2's
+        r_cylinder_closing scales with closing SPEED so a slow creep barely
+        registers. v3 adds r_cylinder_prox: a speed-independent proximity
+        penalty around each cylinder.
+    """
+    min_obstacle_dist, front_min, right_min, left_min = _get_lidar_distances(env)
+    goal_dist, goal_angle = _get_goal_distance_and_angle(env)
+    action_linear, action_angular = _get_real_actions(env)
+    _ensure_stage3_buffers(env, goal_dist, min_obstacle_dist)
+
+    temporal_diff  = _get_lidar_temporal_sector_diff_reward(env)
+    front_temporal = temporal_diff[:, 0]
+    left_temporal  = torch.minimum(temporal_diff[:, 1], temporal_diff[:, 2])
+    right_temporal = torch.minimum(temporal_diff[:, 6], temporal_diff[:, 7])
+
+    CLOSING_THRESH    = -0.0001
+    robot_fwd         = env.scene["robot"].data.root_lin_vel_b[:, 0]
+    robot_front_diff  = robot_fwd * env.step_dt / LIDAR_DISTANCE_CAP
+    front_closing = (front_temporal + robot_front_diff) < CLOSING_THRESH
+    left_closing  = left_temporal  < CLOSING_THRESH
+    right_closing = right_temporal < CLOSING_THRESH
+
+    front_blocked = front_min < 0.40
+    side_tight    = (left_min < 0.35) | (right_min < 0.35)
+
+    front_dynamic_risk = (front_min < 0.50) & front_closing
+    left_dynamic_risk  = (left_min  < 0.40) & left_closing
+    right_dynamic_risk = (right_min < 0.40) & right_closing
+    front_early_risk   = (front_min < 0.75) & front_closing
+
+    dynamic_blocked = front_dynamic_risk | left_dynamic_risk | right_dynamic_risk | front_early_risk
+    tight_space     = front_blocked | side_tight | dynamic_blocked
+    detour_needed   = front_blocked | front_dynamic_risk | left_dynamic_risk | right_dynamic_risk
+
+    # ── 1. Yaw ────────────────────────────────────────────────────────────────
+    near_goal_heading  = goal_dist < 0.40
+    corner_trapped     = front_blocked & side_tight
+    has_escape_room    = (left_min > 0.40) | (right_min > 0.40)
+    open_dodge_active  = front_early_risk & has_escape_room & ~near_goal_heading
+    static_wall_detour = front_blocked & ~front_closing & has_escape_room & ~near_goal_heading
+    r_yaw = torch.where(
+        static_wall_detour, -0.20 * torch.abs(goal_angle),
+        torch.where(open_dodge_active,  -0.40 * torch.abs(goal_angle),
+        torch.where(corner_trapped, -4.00 * torch.abs(goal_angle),
+        torch.where(near_goal_heading & ~detour_needed, -4.00 * torch.abs(goal_angle),
+        torch.where(detour_needed, -1.50 * torch.abs(goal_angle),
+                    -2.00 * torch.abs(goal_angle))))))
+
+    # ── 2. Angular penalty ────────────────────────────────────────────────────
+    misaligned  = torch.abs(goal_angle) > 0.5
+    r_vangular  = torch.where(misaligned, -0.10 * (action_angular ** 2),
+                  torch.where(detour_needed, -0.50 * (action_angular ** 2),
+                              -1.00 * (action_angular ** 2)))
+
+    # ── 3. Goal progress (potential-based, always active) ─────────────────────
+    progress   = env.goal_dist_prev - goal_dist
+    r_distance = progress * 60.0
+    env.goal_dist_prev[:] = goal_dist
+
+    # ── 4. Obstacle soft + hard penalty ───────────────────────────────────────
+    safe_dist       = 0.65
+    terminal_dist   = 0.30
+    r_obstacle_soft = -6.0 * torch.clamp(
+        (safe_dist - min_obstacle_dist) / (safe_dist - terminal_dist), 0.0, 1.0) ** 2
+    r_obstacle_hard = torch.where(
+        min_obstacle_dist < terminal_dist,
+        torch.full_like(min_obstacle_dist, -20.0),
+        torch.zeros_like(min_obstacle_dist))
+    r_obstacle = r_obstacle_soft + r_obstacle_hard
+
+    # ── 5. Linear speed ───────────────────────────────────────────────────────
+    r_vlinear_open = -(((MAX_LINEAR_SPEED - action_linear) * 10.0) ** 2)
+    r_vlinear      = torch.where(tight_space, 0.50 * r_vlinear_open, r_vlinear_open)
+
+    # ── 6. Front push penalty ─────────────────────────────────────────────────
+    r_front_push = torch.where(
+        (front_min < 0.35) & (action_linear > 0.08),
+        torch.full_like(goal_dist, -2.0),
+        torch.zeros_like(goal_dist))
+
+    # ── 6b. Side push penalty (v3) — clipping a side wall at speed ────────────
+    # Collision log: 100% of static collisions were side-wall clips while fast.
+    # Mirrors r_front_push for the left/right sectors.
+    r_side_push = torch.where(
+        ((left_min < 0.30) | (right_min < 0.30)) & (action_linear > 0.12),
+        torch.full_like(goal_dist, -2.0),
+        torch.zeros_like(goal_dist))
+
+    # ── 7. Clearance recovery ─────────────────────────────────────────────────
+    clearance_delta = min_obstacle_dist - env.prev_min_obstacle_dist
+    env.prev_min_obstacle_dist[:] = min_obstacle_dist
+    r_clearance_recovery = torch.where(
+        front_min < 0.65,
+        torch.clamp(clearance_delta, -0.03, 0.03) * 80.0,
+        torch.zeros_like(goal_dist))
+
+    # ── 8. Anti-stuck ─────────────────────────────────────────────────────────
+    genuinely_trapped = ~((left_min > 0.40) | (right_min > 0.40))
+    yielding = (front_dynamic_risk & genuinely_trapped) | left_dynamic_risk | right_dynamic_risk
+    no_progress = (torch.abs(progress) < 0.003) & (goal_dist > 0.28) & ~yielding
+    r_stuck  = torch.where(
+        no_progress & (action_linear < 0.10),
+        torch.full_like(goal_dist, -4.0),
+        torch.zeros_like(goal_dist))
+    r_open_stuck = torch.where(
+        no_progress & (min_obstacle_dist > 0.50),
+        torch.full_like(goal_dist, -3.0),
+        torch.zeros_like(goal_dist))
+
+    # ── 9. Front / static dodge ───────────────────────────────────────────────
+    open_side_turn = torch.where(
+        left_min > right_min,
+        torch.clamp(action_angular,  0.0, 1.0),
+        torch.clamp(-action_angular, 0.0, 1.0))
+    r_front_dodge = torch.where(
+        front_early_risk & has_escape_room & ~near_goal_heading,
+        open_side_turn * 0.30,
+        torch.zeros_like(goal_dist))
+    static_wall_blocked = front_blocked & ~front_closing & has_escape_room & ~near_goal_heading
+    r_static_dodge = torch.where(
+        static_wall_blocked,
+        open_side_turn * 0.50,
+        torch.zeros_like(goal_dist))
+
+    # ── 10. Cylinder collision-course + proximity penalty (sim ground-truth) ──
+    # r_cylinder_closing: scales with closing speed (catches fast approaches).
+    # r_cylinder_prox (v3): speed-independent floor — catches the slow creeps
+    # into a cylinder that closing-speed scaling barely penalizes.
+    robot_xy  = env.scene["robot"].data.root_pos_w[:, :2]
+    robot_vel = env.scene["robot"].data.root_lin_vel_w[:, :2]
+    DANGER_DIST   = 1.0
+    CYL_PROX_DIST = 0.55
+    CYL_PROX_W    = 10.0
+    r_cylinder_closing = torch.zeros_like(goal_dist)
+    r_cylinder_prox    = torch.zeros_like(goal_dist)
+    for okey in [k for k in env.scene.keys() if k.startswith("obstacle_")]:
+        cyl     = env.scene[okey]
+        cyl_xy  = cyl.data.root_pos_w[:, :2]
+        cyl_vel = cyl.data.root_lin_vel_w[:, :2]
+        vec       = cyl_xy - robot_xy
+        dist      = torch.norm(vec, dim=-1).clamp(min=1e-6)
+        direction = vec / dist.unsqueeze(-1)
+        rel_vel   = robot_vel - cyl_vel
+        closing_speed = (rel_vel * direction).sum(dim=-1)
+        proximity = torch.clamp((DANGER_DIST - dist) / DANGER_DIST, 0.0, 1.0)
+        on_course = (dist < DANGER_DIST) & (closing_speed > 0.0)
+        penalty = torch.where(
+            on_course,
+            -closing_speed.clamp(min=0.0) * proximity * 15.0,
+            torch.zeros_like(goal_dist))
+        r_cylinder_closing = torch.minimum(r_cylinder_closing, penalty)
+        prox_frac = torch.clamp((CYL_PROX_DIST - dist) / CYL_PROX_DIST, 0.0, 1.0)
+        r_cylinder_prox = torch.minimum(r_cylinder_prox, -CYL_PROX_W * prox_frac)
+
+    reward = (
+        r_yaw + r_distance + r_obstacle + r_vlinear + r_vangular
+        + r_front_push + r_side_push + r_clearance_recovery + r_stuck + r_open_stuck
+        + r_front_dodge + r_static_dodge + r_cylinder_closing + r_cylinder_prox
+        - 1.0
+    )
+    return reward
+
+
+@configclass
+class Stage4RewardsCfgV3:
+    navigation = RewTerm(func=navigation_reward_stage4_v3, weight=1.0)
+
