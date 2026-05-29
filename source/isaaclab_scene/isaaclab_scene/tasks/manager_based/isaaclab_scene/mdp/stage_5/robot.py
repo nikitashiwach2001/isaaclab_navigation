@@ -1,32 +1,23 @@
-import isaaclab.sim as sim_utils
-from isaaclab.assets import ArticulationCfg
-from isaaclab.actuators import ImplicitActuatorCfg
-from isaaclab.sensors import MultiMeshRayCasterCfg, ContactSensorCfg, patterns
+"""Stage 5 robot/lidar config.
 
-TURTLEBOT3_BURGER_CFG = ArticulationCfg(
-    prim_path="{ENV_REGEX_NS}/Robot",
-    spawn=sim_utils.UsdFileCfg(
-        usd_path="/home/user/Documents/isaaclab_scene/assets/robots/turtlebot3_burger.usd",
-        activate_contact_sensors=True,
-        articulation_props=sim_utils.ArticulationRootPropertiesCfg(
-            enabled_self_collisions=False,
-            fix_root_link=False,
-        ),
-    ),
-    init_state=ArticulationCfg.InitialStateCfg(pos=(0.0, 0.0, 0.0)),
-    actuators={
-        "wheels": ImplicitActuatorCfg(
-            joint_names_expr=["wheel_left_joint", "wheel_right_joint"],
-            stiffness=0.0,
-            damping=50.0,
-            velocity_limit=10.0,
-        ),
-    },
-)
+Robot articulation and contact-sensor configs come from the shared
+registry-driven ``mdp/robot.py`` (TurtleBot ↔ ict_bot via ``ROBOT`` env var).
+This module only overrides the lidar's mesh-target list to also pick up
+``InnerWall_*`` prims that Stage 5 introduces.
+"""
+
+from isaaclab.sensors import MultiMeshRayCasterCfg, patterns
+
+from ..robot_registry import CFG as _ROBOT_CFG
+from ..robot import TURTLEBOT3_BURGER_CFG, CONTACT_SENSOR_CFG  # re-export
+
+
+_BASE_LINK = _ROBOT_CFG["base_link"]
+
 
 LIDAR_CFG_5 = MultiMeshRayCasterCfg(
-    prim_path="{ENV_REGEX_NS}/Robot/base_link",
-    offset=MultiMeshRayCasterCfg.OffsetCfg(pos=(0.0, 0.0, 0.2)),
+    prim_path="{ENV_REGEX_NS}/Robot/" + _BASE_LINK,
+    offset=MultiMeshRayCasterCfg.OffsetCfg(pos=(0.0, 0.0, _ROBOT_CFG["lidar_offset_z"])),
     ray_alignment="yaw",
     pattern_cfg=patterns.LidarPatternCfg(
         channels=1,
@@ -51,18 +42,11 @@ LIDAR_CFG_5 = MultiMeshRayCasterCfg(
             merge_prim_meshes=True,
             track_mesh_transforms=False,
         ),
-        # three moving obstacles — each tracked independently (merge=False required)
+        # moving obstacles — each tracked independently (merge=False required)
         MultiMeshRayCasterCfg.RaycastTargetCfg(
             prim_expr="{ENV_REGEX_NS}/Obstacle_*",
             track_mesh_transforms=True,
             merge_prim_meshes=False,
         ),
     ],
-)
-
-CONTACT_SENSOR_CFG = ContactSensorCfg(
-    prim_path="{ENV_REGEX_NS}/Robot/base_link",
-    update_period=0.0,
-    history_length=2,
-    track_air_time=False,
 )

@@ -1,4 +1,5 @@
 import math
+import os
 import torch
 
 from isaaclab.envs import ManagerBasedRLEnv
@@ -8,6 +9,19 @@ from isaaclab.utils import configclass
 
 
 LIDAR_DISTANCE_CAP = 3.5
+
+# Which body-frame axis points in the robot's physical forward (motion) direction.
+# Pulled from the robot registry so it follows ROBOT=turtlebot|ictbot; FORWARD_AXIS
+# env var still overrides if set explicitly. Affects goal_angle and robot_velocity.
+from .robot_registry import FORWARD_AXIS as _FORWARD_AXIS  # already env-resolved
+_AXIS_YAW_OFFSET = {
+    "X":   0.0,
+    "Y":   math.pi / 2.0,
+    "-X":  math.pi,
+    "-Y": -math.pi / 2.0,
+}.get(_FORWARD_AXIS, 0.0)
+_AXIS_VEL_INDEX = {"X": 0, "-X": 0, "Y": 1, "-Y": 1}.get(_FORWARD_AXIS, 0)
+_AXIS_VEL_SIGN  = {"X": 1.0, "-X": -1.0, "Y": 1.0, "-Y": -1.0}.get(_FORWARD_AXIS, 1.0)
 
 
 def get_goal_pos_w(env: ManagerBasedRLEnv) -> torch.Tensor:
@@ -72,9 +86,9 @@ def lidar_scan(env: ManagerBasedRLEnv) -> torch.Tensor:
     return _compute_lidar_scan(env)
 
 
-N_LIDAR_HISTORY = 6  # frames stacked: t, t-1, t-2, t-3, t-4, t-5
-# Extended from 3 → 6 to give the policy enough history to estimate obstacle
-# velocity AND acceleration for trajectory prediction (5 velocity samples + 4 accel).
+N_LIDAR_HISTORY = int(os.environ.get("LIDAR_STACK_FRAMES", "6"))
+# Frames stacked along the conv input axis. Default 6 (Stage 4/5/6 baseline).
+# Override via LIDAR_STACK_FRAMES env var if a wider temporal window is needed.
 
 
 def lidar_stacked(env: ManagerBasedRLEnv) -> torch.Tensor:
@@ -235,6 +249,13 @@ def goal_angle(env: ManagerBasedRLEnv) -> torch.Tensor:
         1.0 - 2.0 * (qy * qy + qz * qz),
     )
 
+    # Shift yaw so it measures the direction of the robot's actual forward axis
+    # (not necessarily body +X). For ict_bot (forward = body -Y) this subtracts
+    # π/2 so goal_angle = 0 means goal is in front of the robot, not on its right.
+    # No-op when FORWARD_AXIS="X" (TurtleBot), so this preserves training-time
+    # behavior for the original policy.
+    yaw = yaw + _AXIS_YAW_OFFSET
+
     angle = heading_to_goal - yaw
     angle = torch.atan2(torch.sin(angle), torch.cos(angle))
     angle = angle / math.pi
@@ -305,8 +326,11 @@ def robot_velocity(env: ManagerBasedRLEnv) -> torch.Tensor:
     wheels slip or the actuator doesn't respond instantly.
     """
     robot = env.scene["robot"]
-    lin = robot.data.root_lin_vel_b[:, 0:1]   # forward (body x)
-    ang = robot.data.root_ang_vel_b[:, 2:3]   # yaw rate (body z)
+    # Pick the body-frame axis that points in the robot's forward direction.
+    # No-op for TurtleBot (axis=X → idx=0, sign=+1); ict_bot uses axis=-Y → idx=1, sign=-1
+    # so positive `lin` always means the robot is moving forward.
+    lin = _AXIS_VEL_SIGN * robot.data.root_lin_vel_b[:, _AXIS_VEL_INDEX:_AXIS_VEL_INDEX + 1]
+    ang = robot.data.root_ang_vel_b[:, 2:3]   # yaw rate (body z) — unchanged
     lin_norm = torch.clamp(lin / _MAX_LIN_VEL, -1.0, 1.0)
     ang_norm = torch.clamp(ang / _MAX_ANG_VEL, -1.0, 1.0)
     return torch.cat([lin_norm, ang_norm], dim=-1)

@@ -46,7 +46,6 @@ parser.add_argument("--reset_critic", action="store_true", default=False, help="
 parser.add_argument("--use_gru", action="store_true", default=False, help="Use GRU actor for temporal memory.")
 parser.add_argument("--use_conv", action="store_true", default=False, help="Use 1D conv lidar encoder (ConvActor/ConvCritic). Not weight-compatible with MLP checkpoints.")
 parser.add_argument("--privileged_critic", action="store_true", default=False, help="Asymmetric actor-critic: the critic also reads the env's 'privileged' obs group (cylinder pos/vel). The actor stays lidar-only and is deployable unchanged.")
-
 AppLauncher.add_app_launcher_args(parser)
 args_cli = parser.parse_args()
 

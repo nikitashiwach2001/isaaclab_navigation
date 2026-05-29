@@ -1,6 +1,13 @@
+import os
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+
+
+# Frames-per-stack must match the env's observation spec. Default 6 matches
+# the Stage 4/5/6 observation; set LIDAR_STACK_FRAMES in the shell to override.
+_N_LIDAR_FRAMES = int(os.environ.get("LIDAR_STACK_FRAMES", "6"))
 
 
 def init_weights(module: nn.Module):
@@ -107,7 +114,7 @@ class ConvLidarEncoder(nn.Module):
     14 observation dims.
     """
 
-    def __init__(self, n_frames: int = 6, n_rays: int = 90, output_dim: int = 128):
+    def __init__(self, n_frames: int = _N_LIDAR_FRAMES, n_rays: int = 90, output_dim: int = 128):
         super().__init__()
         self.n_frames = n_frames
         self.n_rays   = n_rays
@@ -131,7 +138,7 @@ class ConvLidarEncoder(nn.Module):
         return x
 
 
-_N_LIDAR_DIMS = 540  # 6 frames x 90 rays — matches observations.lidar_stacked
+_N_LIDAR_DIMS = _N_LIDAR_FRAMES * 90  # matches observations.lidar_stacked (varies with LIDAR_STACK_FRAMES)
 
 
 class ConvActor(nn.Module):

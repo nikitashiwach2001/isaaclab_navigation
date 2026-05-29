@@ -1,0 +1,2358 @@
+[
+  {
+    "episode": 4,
+    "env_id": 39,
+    "outcome": "COLL_STATIC",
+    "step_count": 284,
+    "robot_pos_local": [
+      0.762,
+      -1.526
+    ],
+    "robot_yaw_rad": -1.377,
+    "robot_speed": 0.216,
+    "last_action": [
+      1.0,
+      0.139
+    ],
+    "goal_local": [
+      1.5,
+      0.8
+    ],
+    "dist_to_goal": 2.44,
+    "closest_obstacle": "obstacle_3",
+    "closest_dist": 0.829,
+    "obstacles": {
+      "obstacle_1": {
+        "pos_local": [
+          1.187,
+          1.0
+        ],
+        "dist": 2.562
+      },
+      "obstacle_2": {
+        "pos_local": [
+          -0.218,
+          0.713
+        ],
+        "dist": 2.444
+      },
+      "obstacle_3": {
+        "pos_local": [
+          1.506,
+          -1.161
+        ],
+        "dist": 0.829
+      },
+      "obstacle_4": {
+        "pos_local": [
+          -0.8,
+          0.248
+        ],
+        "dist": 2.363
+      },
+      "obstacle_5": {
+        "pos_local": [
+          0.7,
+          0.782
+        ],
+        "dist": 2.309
+      }
+    },
+    "lidar_min_dist": 0.301,
+    "lidar_min_ray_idx": 3
+  },
+  {
+    "episode": 5,
+    "env_id": 38,
+    "outcome": "COLL_STATIC",
+    "step_count": 290,
+    "robot_pos_local": [
+      0.761,
+      -1.514
+    ],
+    "robot_yaw_rad": -1.352,
+    "robot_speed": 0.215,
+    "last_action": [
+      1.0,
+      -0.074
+    ],
+    "goal_local": [
+      0.5,
+      -2.0
+    ],
+    "dist_to_goal": 0.551,
+    "closest_obstacle": "obstacle_2",
+    "closest_dist": 2.16,
+    "obstacles": {
+      "obstacle_1": {
+        "pos_local": [
+          0.299,
+          1.0
+        ],
+        "dist": 2.557
+      },
+      "obstacle_2": {
+        "pos_local": [
+          0.102,
+          0.543
+        ],
+        "dist": 2.16
+      },
+      "obstacle_3": {
+        "pos_local": [
+          0.122,
+          1.725
+        ],
+        "dist": 3.302
+      },
+      "obstacle_4": {
+        "pos_local": [
+          -0.8,
+          0.764
+        ],
+        "dist": 2.762
+      },
+      "obstacle_5": {
+        "pos_local": [
+          0.7,
+          1.3
+        ],
+        "dist": 2.815
+      }
+    },
+    "lidar_min_dist": 0.3,
+    "lidar_min_ray_idx": 2
+  },
+  {
+    "episode": 10,
+    "env_id": 57,
+    "outcome": "COLL_STATIC",
+    "step_count": 318,
+    "robot_pos_local": [
+      -0.99,
+      0.24
+    ],
+    "robot_yaw_rad": -0.06,
+    "robot_speed": 0.193,
+    "last_action": [
+      0.76,
+      -1.0
+    ],
+    "goal_local": [
+      -1.5,
+      2.0
+    ],
+    "dist_to_goal": 1.833,
+    "closest_obstacle": "obstacle_4",
+    "closest_dist": 0.325,
+    "obstacles": {
+      "obstacle_1": {
+        "pos_local": [
+          -1.528,
+          0.723
+        ],
+        "dist": 0.723
+      },
+      "obstacle_2": {
+        "pos_local": [
+          -1.009,
+          -1.507
+        ],
+        "dist": 1.747
+      },
+      "obstacle_3": {
+        "pos_local": [
+          1.329,
+          -1.543
+        ],
+        "dist": 2.925
+      },
+      "obstacle_4": {
+        "pos_local": [
+          -0.8,
+          0.503
+        ],
+        "dist": 0.325
+      },
+      "obstacle_5": {
+        "pos_local": [
+          0.7,
+          1.3
+        ],
+        "dist": 1.995
+      }
+    },
+    "lidar_min_dist": 0.301,
+    "lidar_min_ray_idx": 13
+  },
+  {
+    "episode": 32,
+    "env_id": 5,
+    "outcome": "COLL_DYNAMIC",
+    "step_count": 169,
+    "robot_pos_local": [
+      -0.314,
+      0.012
+    ],
+    "robot_yaw_rad": 2.961,
+    "robot_speed": 0.076,
+    "last_action": [
+      -0.982,
+      -1.0
+    ],
+    "goal_local": [
+      -2.0,
+      -0.8
+    ],
+    "dist_to_goal": 1.871,
+    "closest_obstacle": "obstacle_3",
+    "closest_dist": 0.324,
+    "obstacles": {
+      "obstacle_1": {
+        "pos_local": [
+          -0.006,
+          1.0
+        ],
+        "dist": 1.034
+      },
+      "obstacle_2": {
+        "pos_local": [
+          -0.34,
+          0.777
+        ],
+        "dist": 0.765
+      },
+      "obstacle_3": {
+        "pos_local": [
+          -0.494,
+          -0.257
+        ],
+        "dist": 0.324
+      },
+      "obstacle_4": {
+        "pos_local": [
+          -0.8,
+          -1.0
+        ],
+        "dist": 1.123
+      },
+      "obstacle_5": {
+        "pos_local": [
+          0.7,
+          -0.2
+        ],
+        "dist": 1.036
+      }
+    },
+    "lidar_min_dist": 0.302,
+    "lidar_min_ray_idx": 59
+  },
+  {
+    "episode": 53,
+    "env_id": 52,
+    "outcome": "COLL_DYNAMIC",
+    "step_count": 644,
+    "robot_pos_local": [
+      -1.034,
+      1.154
+    ],
+    "robot_yaw_rad": -2.105,
+    "robot_speed": 0.169,
+    "last_action": [
+      0.194,
+      -1.0
+    ],
+    "goal_local": [
+      0.5,
+      -2.0
+    ],
+    "dist_to_goal": 3.507,
+    "closest_obstacle": "obstacle_2",
+    "closest_dist": 0.322,
+    "obstacles": {
+      "obstacle_1": {
+        "pos_local": [
+          -0.664,
+          1.0
+        ],
+        "dist": 0.401
+      },
+      "obstacle_2": {
+        "pos_local": [
+          -1.322,
+          1.299
+        ],
+        "dist": 0.322
+      },
+      "obstacle_3": {
+        "pos_local": [
+          0.321,
+          0.322
+        ],
+        "dist": 1.591
+      },
+      "obstacle_4": {
+        "pos_local": [
+          -0.8,
+          -1.0
+        ],
+        "dist": 2.166
+      },
+      "obstacle_5": {
+        "pos_local": [
+          0.7,
+          -0.2
+        ],
+        "dist": 2.2
+      }
+    },
+    "lidar_min_dist": 0.301,
+    "lidar_min_ray_idx": 38
+  },
+  {
+    "episode": 65,
+    "env_id": 20,
+    "outcome": "COLL_BOUNDARY",
+    "step_count": 771,
+    "robot_pos_local": [
+      -2.183,
+      0.247
+    ],
+    "robot_yaw_rad": 2.211,
+    "robot_speed": 0.125,
+    "last_action": [
+      0.017,
+      -1.0
+    ],
+    "goal_local": [
+      1.5,
+      -1.8
+    ],
+    "dist_to_goal": 4.214,
+    "closest_obstacle": "obstacle_1",
+    "closest_dist": 0.702,
+    "obstacles": {
+      "obstacle_1": {
+        "pos_local": [
+          -1.546,
+          0.541
+        ],
+        "dist": 0.702
+      },
+      "obstacle_2": {
+        "pos_local": [
+          -0.444,
+          0.833
+        ],
+        "dist": 1.835
+      },
+      "obstacle_3": {
+        "pos_local": [
+          1.364,
+          1.576
+        ],
+        "dist": 3.788
+      },
+      "obstacle_4": {
+        "pos_local": [
+          -0.8,
+          -1.0
+        ],
+        "dist": 1.862
+      },
+      "obstacle_5": {
+        "pos_local": [
+          0.7,
+          -0.2
+        ],
+        "dist": 2.918
+      }
+    },
+    "lidar_min_dist": 0.3,
+    "lidar_min_ray_idx": 45
+  },
+  {
+    "episode": 126,
+    "env_id": 45,
+    "outcome": "COLL_DYNAMIC",
+    "step_count": 541,
+    "robot_pos_local": [
+      -0.107,
+      -1.549
+    ],
+    "robot_yaw_rad": 1.576,
+    "robot_speed": 0.214,
+    "last_action": [
+      1.0,
+      -0.366
+    ],
+    "goal_local": [
+      -1.0,
+      -2.0
+    ],
+    "dist_to_goal": 1.001,
+    "closest_obstacle": "obstacle_3",
+    "closest_dist": 0.32,
+    "obstacles": {
+      "obstacle_1": {
+        "pos_local": [
+          -1.322,
+          1.0
+        ],
+        "dist": 2.824
+      },
+      "obstacle_2": {
+        "pos_local": [
+          1.5,
+          -0.735
+        ],
+        "dist": 1.801
+      },
+      "obstacle_3": {
+        "pos_local": [
+          0.199,
+          -1.646
+        ],
+        "dist": 0.32
+      },
+      "obstacle_4": {
+        "pos_local": [
+          -0.8,
+          -1.0
+        ],
+        "dist": 0.884
+      },
+      "obstacle_5": {
+        "pos_local": [
+          0.7,
+          0.222
+        ],
+        "dist": 1.946
+      }
+    },
+    "lidar_min_dist": 0.3,
+    "lidar_min_ray_idx": 86
+  },
+  {
+    "episode": 141,
+    "env_id": 36,
+    "outcome": "COLL_DYNAMIC",
+    "step_count": 475,
+    "robot_pos_local": [
+      -0.036,
+      -1.981
+    ],
+    "robot_yaw_rad": -3.012,
+    "robot_speed": 0.057,
+    "last_action": [
+      -0.931,
+      -1.0
+    ],
+    "goal_local": [
+      0.5,
+      -2.0
+    ],
+    "dist_to_goal": 0.536,
+    "closest_obstacle": "obstacle_3",
+    "closest_dist": 0.325,
+    "obstacles": {
+      "obstacle_1": {
+        "pos_local": [
+          1.932,
+          1.865
+        ],
+        "dist": 4.32
+      },
+      "obstacle_2": {
+        "pos_local": [
+          -1.723,
+          -1.945
+        ],
+        "dist": 1.687
+      },
+      "obstacle_3": {
+        "pos_local": [
+          0.024,
+          -1.661
+        ],
+        "dist": 0.325
+      },
+      "obstacle_4": {
+        "pos_local": [
+          -0.8,
+          -0.563
+        ],
+        "dist": 1.611
+      },
+      "obstacle_5": {
+        "pos_local": [
+          0.7,
+          -0.2
+        ],
+        "dist": 1.927
+      }
+    },
+    "lidar_min_dist": 0.301,
+    "lidar_min_ray_idx": 20
+  },
+  {
+    "episode": 144,
+    "env_id": 48,
+    "outcome": "COLL_STATIC",
+    "step_count": 1013,
+    "robot_pos_local": [
+      -0.256,
+      -1.487
+    ],
+    "robot_yaw_rad": 2.309,
+    "robot_speed": 0.215,
+    "last_action": [
+      1.0,
+      -0.806
+    ],
+    "goal_local": [
+      -1.5,
+      2.0
+    ],
+    "dist_to_goal": 3.702,
+    "closest_obstacle": "obstacle_2",
+    "closest_dist": 1.687,
+    "obstacles": {
+      "obstacle_1": {
+        "pos_local": [
+          -1.581,
+          0.192
+        ],
+        "dist": 2.139
+      },
+      "obstacle_2": {
+        "pos_local": [
+          -1.874,
+          -1.964
+        ],
+        "dist": 1.687
+      },
+      "obstacle_3": {
+        "pos_local": [
+          0.241,
+          0.466
+        ],
+        "dist": 2.016
+      },
+      "obstacle_4": {
+        "pos_local": [
+          -0.8,
+          0.8
+        ],
+        "dist": 2.351
+      },
+      "obstacle_5": {
+        "pos_local": [
+          0.7,
+          1.107
+        ],
+        "dist": 2.765
+      }
+    },
+    "lidar_min_dist": 0.302,
+    "lidar_min_ray_idx": 47
+  },
+  {
+    "episode": 158,
+    "env_id": 8,
+    "outcome": "COLL_STATIC",
+    "step_count": 320,
+    "robot_pos_local": [
+      -0.521,
+      1.213
+    ],
+    "robot_yaw_rad": -0.204,
+    "robot_speed": 0.131,
+    "last_action": [
+      0.519,
+      -0.772
+    ],
+    "goal_local": [
+      0.0,
+      2.0
+    ],
+    "dist_to_goal": 0.943,
+    "closest_obstacle": "obstacle_1",
+    "closest_dist": 0.327,
+    "obstacles": {
+      "obstacle_1": {
+        "pos_local": [
+          -0.273,
+          1.0
+        ],
+        "dist": 0.327
+      },
+      "obstacle_2": {
+        "pos_local": [
+          1.5,
+          -0.903
+        ],
+        "dist": 2.926
+      },
+      "obstacle_3": {
+        "pos_local": [
+          0.331,
+          1.7
+        ],
+        "dist": 0.981
+      },
+      "obstacle_4": {
+        "pos_local": [
+          -0.8,
+          0.656
+        ],
+        "dist": 0.623
+      },
+      "obstacle_5": {
+        "pos_local": [
+          0.7,
+          -0.2
+        ],
+        "dist": 1.867
+      }
+    },
+    "lidar_min_dist": 0.302,
+    "lidar_min_ray_idx": 80
+  },
+  {
+    "episode": 193,
+    "env_id": 45,
+    "outcome": "COLL_DYNAMIC",
+    "step_count": 558,
+    "robot_pos_local": [
+      -0.012,
+      -1.707
+    ],
+    "robot_yaw_rad": -0.882,
+    "robot_speed": 0.217,
+    "last_action": [
+      0.691,
+      0.997
+    ],
+    "goal_local": [
+      0.0,
+      2.0
+    ],
+    "dist_to_goal": 3.707,
+    "closest_obstacle": "obstacle_2",
+    "closest_dist": 0.323,
+    "obstacles": {
+      "obstacle_1": {
+        "pos_local": [
+          -1.662,
+          -0.623
+        ],
+        "dist": 1.974
+      },
+      "obstacle_2": {
+        "pos_local": [
+          0.292,
+          -1.597
+        ],
+        "dist": 0.323
+      },
+      "obstacle_3": {
+        "pos_local": [
+          -0.67,
+          -0.527
+        ],
+        "dist": 1.351
+      },
+      "obstacle_4": {
+        "pos_local": [
+          -0.8,
+          0.077
+        ],
+        "dist": 1.95
+      },
+      "obstacle_5": {
+        "pos_local": [
+          0.7,
+          -0.2
+        ],
+        "dist": 1.666
+      }
+    },
+    "lidar_min_dist": 0.301,
+    "lidar_min_ray_idx": 4
+  },
+  {
+    "episode": 195,
+    "env_id": 21,
+    "outcome": "TIMEOUT",
+    "step_count": 1500,
+    "robot_pos_local": [
+      1.136,
+      0.872
+    ],
+    "robot_yaw_rad": -1.722,
+    "robot_speed": 0.186,
+    "last_action": [
+      0.782,
+      0.044
+    ],
+    "goal_local": [
+      1.5,
+      0.8
+    ],
+    "dist_to_goal": 0.371,
+    "closest_obstacle": "obstacle_5",
+    "closest_dist": 0.611,
+    "obstacles": {
+      "obstacle_1": {
+        "pos_local": [
+          -1.603,
+          -0.03
+        ],
+        "dist": 2.884
+      },
+      "obstacle_2": {
+        "pos_local": [
+          -0.594,
+          0.913
+        ],
+        "dist": 1.731
+      },
+      "obstacle_3": {
+        "pos_local": [
+          0.459,
+          0.074
+        ],
+        "dist": 1.047
+      },
+      "obstacle_4": {
+        "pos_local": [
+          -0.8,
+          -1.0
+        ],
+        "dist": 2.693
+      },
+      "obstacle_5": {
+        "pos_local": [
+          0.7,
+          1.3
+        ],
+        "dist": 0.611
+      }
+    },
+    "lidar_min_dist": 0.516,
+    "lidar_min_ray_idx": 34
+  },
+  {
+    "episode": 211,
+    "env_id": 10,
+    "outcome": "TIMEOUT",
+    "step_count": 1500,
+    "robot_pos_local": [
+      -0.929,
+      0.862
+    ],
+    "robot_yaw_rad": -1.586,
+    "robot_speed": 0.016,
+    "last_action": [
+      -0.847,
+      -0.999
+    ],
+    "goal_local": [
+      -2.0,
+      -0.8
+    ],
+    "dist_to_goal": 1.977,
+    "closest_obstacle": "obstacle_2",
+    "closest_dist": 0.386,
+    "obstacles": {
+      "obstacle_1": {
+        "pos_local": [
+          -0.051,
+          1.0
+        ],
+        "dist": 0.889
+      },
+      "obstacle_2": {
+        "pos_local": [
+          -1.125,
+          1.195
+        ],
+        "dist": 0.386
+      },
+      "obstacle_3": {
+        "pos_local": [
+          1.212,
+          -0.821
+        ],
+        "dist": 2.723
+      },
+      "obstacle_4": {
+        "pos_local": [
+          -0.8,
+          0.094
+        ],
+        "dist": 0.779
+      },
+      "obstacle_5": {
+        "pos_local": [
+          0.7,
+          -0.2
+        ],
+        "dist": 1.945
+      }
+    },
+    "lidar_min_dist": 0.339,
+    "lidar_min_ray_idx": 30
+  },
+  {
+    "episode": 214,
+    "env_id": 58,
+    "outcome": "COLL_DYNAMIC",
+    "step_count": 1066,
+    "robot_pos_local": [
+      0.082,
+      -1.764
+    ],
+    "robot_yaw_rad": -1.079,
+    "robot_speed": 0.091,
+    "last_action": [
+      -0.604,
+      -1.0
+    ],
+    "goal_local": [
+      -2.0,
+      0.8
+    ],
+    "dist_to_goal": 3.303,
+    "closest_obstacle": "obstacle_3",
+    "closest_dist": 0.323,
+    "obstacles": {
+      "obstacle_1": {
+        "pos_local": [
+          0.094,
+          1.0
+        ],
+        "dist": 2.764
+      },
+      "obstacle_2": {
+        "pos_local": [
+          -1.247,
+          -1.698
+        ],
+        "dist": 1.331
+      },
+      "obstacle_3": {
+        "pos_local": [
+          0.376,
+          -1.629
+        ],
+        "dist": 0.323
+      },
+      "obstacle_4": {
+        "pos_local": [
+          -0.8,
+          -0.214
+        ],
+        "dist": 1.784
+      },
+      "obstacle_5": {
+        "pos_local": [
+          0.7,
+          -0.128
+        ],
+        "dist": 1.748
+      }
+    },
+    "lidar_min_dist": 0.302,
+    "lidar_min_ray_idx": 6
+  },
+  {
+    "episode": 269,
+    "env_id": 20,
+    "outcome": "COLL_DYNAMIC",
+    "step_count": 307,
+    "robot_pos_local": [
+      -0.076,
+      -1.617
+    ],
+    "robot_yaw_rad": -1.632,
+    "robot_speed": 0.219,
+    "last_action": [
+      0.978,
+      -0.283
+    ],
+    "goal_local": [
+      1.5,
+      0.8
+    ],
+    "dist_to_goal": 2.886,
+    "closest_obstacle": "obstacle_3",
+    "closest_dist": 0.322,
+    "obstacles": {
+      "obstacle_1": {
+        "pos_local": [
+          0.294,
+          1.0
+        ],
+        "dist": 2.643
+      },
+      "obstacle_2": {
+        "pos_local": [
+          -1.611,
+          -1.922
+        ],
+        "dist": 1.564
+      },
+      "obstacle_3": {
+        "pos_local": [
+          0.245,
+          -1.641
+        ],
+        "dist": 0.322
+      },
+      "obstacle_4": {
+        "pos_local": [
+          -0.8,
+          -1.0
+        ],
+        "dist": 0.951
+      },
+      "obstacle_5": {
+        "pos_local": [
+          0.7,
+          1.3
+        ],
+        "dist": 3.019
+      }
+    },
+    "lidar_min_dist": 0.302,
+    "lidar_min_ray_idx": 89
+  },
+  {
+    "episode": 279,
+    "env_id": 53,
+    "outcome": "COLL_DYNAMIC",
+    "step_count": 959,
+    "robot_pos_local": [
+      0.386,
+      1.181
+    ],
+    "robot_yaw_rad": -0.881,
+    "robot_speed": 0.221,
+    "last_action": [
+      1.0,
+      -0.848
+    ],
+    "goal_local": [
+      -1.0,
+      -2.0
+    ],
+    "dist_to_goal": 3.47,
+    "closest_obstacle": "obstacle_5",
+    "closest_dist": 0.325,
+    "obstacles": {
+      "obstacle_1": {
+        "pos_local": [
+          -0.732,
+          1.0
+        ],
+        "dist": 1.133
+      },
+      "obstacle_2": {
+        "pos_local": [
+          -1.114,
+          1.5
+        ],
+        "dist": 1.534
+      },
+      "obstacle_3": {
+        "pos_local": [
+          0.345,
+          1.699
+        ],
+        "dist": 0.519
+      },
+      "obstacle_4": {
+        "pos_local": [
+          -0.8,
+          -0.062
+        ],
+        "dist": 1.718
+      },
+      "obstacle_5": {
+        "pos_local": [
+          0.7,
+          1.097
+        ],
+        "dist": 0.325
+      }
+    },
+    "lidar_min_dist": 0.3,
+    "lidar_min_ray_idx": 86
+  },
+  {
+    "episode": 281,
+    "env_id": 26,
+    "outcome": "COLL_STATIC",
+    "step_count": 797,
+    "robot_pos_local": [
+      -0.443,
+      1.22
+    ],
+    "robot_yaw_rad": -0.649,
+    "robot_speed": 0.176,
+    "last_action": [
+      0.415,
+      -0.857
+    ],
+    "goal_local": [
+      0.0,
+      2.0
+    ],
+    "dist_to_goal": 0.897,
+    "closest_obstacle": "obstacle_1",
+    "closest_dist": 0.327,
+    "obstacles": {
+      "obstacle_1": {
+        "pos_local": [
+          -0.201,
+          1.0
+        ],
+        "dist": 0.327
+      },
+      "obstacle_2": {
+        "pos_local": [
+          -1.352,
+          -1.815
+        ],
+        "dist": 3.168
+      },
+      "obstacle_3": {
+        "pos_local": [
+          0.466,
+          0.733
+        ],
+        "dist": 1.031
+      },
+      "obstacle_4": {
+        "pos_local": [
+          -0.8,
+          0.788
+        ],
+        "dist": 0.56
+      },
+      "obstacle_5": {
+        "pos_local": [
+          0.7,
+          -0.2
+        ],
+        "dist": 1.823
+      }
+    },
+    "lidar_min_dist": 0.302,
+    "lidar_min_ray_idx": 80
+  },
+  {
+    "episode": 294,
+    "env_id": 52,
+    "outcome": "COLL_STATIC",
+    "step_count": 804,
+    "robot_pos_local": [
+      -0.262,
+      -1.476
+    ],
+    "robot_yaw_rad": 2.054,
+    "robot_speed": 0.218,
+    "last_action": [
+      0.999,
+      -0.863
+    ],
+    "goal_local": [
+      0.0,
+      2.0
+    ],
+    "dist_to_goal": 3.485,
+    "closest_obstacle": "obstacle_2",
+    "closest_dist": 1.732,
+    "obstacles": {
+      "obstacle_1": {
+        "pos_local": [
+          -0.039,
+          1.0
+        ],
+        "dist": 2.486
+      },
+      "obstacle_2": {
+        "pos_local": [
+          -1.918,
+          -1.984
+        ],
+        "dist": 1.732
+      },
+      "obstacle_3": {
+        "pos_local": [
+          1.706,
+          1.353
+        ],
+        "dist": 3.446
+      },
+      "obstacle_4": {
+        "pos_local": [
+          -0.8,
+          0.473
+        ],
+        "dist": 2.022
+      },
+      "obstacle_5": {
+        "pos_local": [
+          0.7,
+          0.642
+        ],
+        "dist": 2.326
+      }
+    },
+    "lidar_min_dist": 0.301,
+    "lidar_min_ray_idx": 48
+  },
+  {
+    "episode": 325,
+    "env_id": 60,
+    "outcome": "COLL_BOUNDARY",
+    "step_count": 1358,
+    "robot_pos_local": [
+      -2.184,
+      0.744
+    ],
+    "robot_yaw_rad": 2.23,
+    "robot_speed": 0.172,
+    "last_action": [
+      0.363,
+      -1.0
+    ],
+    "goal_local": [
+      -2.0,
+      1.8
+    ],
+    "dist_to_goal": 1.072,
+    "closest_obstacle": "obstacle_2",
+    "closest_dist": 1.153,
+    "obstacles": {
+      "obstacle_1": {
+        "pos_local": [
+          -0.768,
+          1.0
+        ],
+        "dist": 1.439
+      },
+      "obstacle_2": {
+        "pos_local": [
+          -1.314,
+          1.5
+        ],
+        "dist": 1.153
+      },
+      "obstacle_3": {
+        "pos_local": [
+          0.544,
+          1.675
+        ],
+        "dist": 2.882
+      },
+      "obstacle_4": {
+        "pos_local": [
+          -0.8,
+          -1.0
+        ],
+        "dist": 2.226
+      },
+      "obstacle_5": {
+        "pos_local": [
+          0.7,
+          1.3
+        ],
+        "dist": 2.937
+      }
+    },
+    "lidar_min_dist": 0.3,
+    "lidar_min_ray_idx": 45
+  },
+  {
+    "episode": 328,
+    "env_id": 10,
+    "outcome": "COLL_DYNAMIC",
+    "step_count": 619,
+    "robot_pos_local": [
+      -0.894,
+      -0.36
+    ],
+    "robot_yaw_rad": 1.52,
+    "robot_speed": 0.181,
+    "last_action": [
+      -0.274,
+      -1.0
+    ],
+    "goal_local": [
+      0.5,
+      -2.0
+    ],
+    "dist_to_goal": 2.153,
+    "closest_obstacle": "obstacle_4",
+    "closest_dist": 0.328,
+    "obstacles": {
+      "obstacle_1": {
+        "pos_local": [
+          1.922,
+          1.844
+        ],
+        "dist": 3.576
+      },
+      "obstacle_2": {
+        "pos_local": [
+          1.5,
+          -1.115
+        ],
+        "dist": 2.51
+      },
+      "obstacle_3": {
+        "pos_local": [
+          -0.956,
+          -0.965
+        ],
+        "dist": 0.609
+      },
+      "obstacle_4": {
+        "pos_local": [
+          -0.8,
+          -0.045
+        ],
+        "dist": 0.328
+      },
+      "obstacle_5": {
+        "pos_local": [
+          0.7,
+          1.3
+        ],
+        "dist": 2.301
+      }
+    },
+    "lidar_min_dist": 0.303,
+    "lidar_min_ray_idx": 18
+  },
+  {
+    "episode": 349,
+    "env_id": 49,
+    "outcome": "COLL_DYNAMIC",
+    "step_count": 701,
+    "robot_pos_local": [
+      -0.952,
+      -0.384
+    ],
+    "robot_yaw_rad": 0.502,
+    "robot_speed": 0.003,
+    "last_action": [
+      -1.0,
+      0.731
+    ],
+    "goal_local": [
+      1.5,
+      -1.8
+    ],
+    "dist_to_goal": 2.831,
+    "closest_obstacle": "obstacle_4",
+    "closest_dist": 0.322,
+    "obstacles": {
+      "obstacle_1": {
+        "pos_local": [
+          0.112,
+          1.0
+        ],
+        "dist": 1.746
+      },
+      "obstacle_2": {
+        "pos_local": [
+          -1.512,
+          -1.902
+        ],
+        "dist": 1.618
+      },
+      "obstacle_3": {
+        "pos_local": [
+          -0.756,
+          -0.659
+        ],
+        "dist": 0.337
+      },
+      "obstacle_4": {
+        "pos_local": [
+          -0.8,
+          -0.1
+        ],
+        "dist": 0.322
+      },
+      "obstacle_5": {
+        "pos_local": [
+          0.7,
+          0.204
+        ],
+        "dist": 1.754
+      }
+    },
+    "lidar_min_dist": 0.3,
+    "lidar_min_ray_idx": 15
+  },
+  {
+    "episode": 353,
+    "env_id": 35,
+    "outcome": "COLL_DYNAMIC",
+    "step_count": 585,
+    "robot_pos_local": [
+      -0.531,
+      1.826
+    ],
+    "robot_yaw_rad": -2.748,
+    "robot_speed": 0.209,
+    "last_action": [
+      0.906,
+      -0.765
+    ],
+    "goal_local": [
+      -1.0,
+      -2.0
+    ],
+    "dist_to_goal": 3.855,
+    "closest_obstacle": "obstacle_2",
+    "closest_dist": 0.327,
+    "obstacles": {
+      "obstacle_1": {
+        "pos_local": [
+          -0.722,
+          1.0
+        ],
+        "dist": 0.848
+      },
+      "obstacle_2": {
+        "pos_local": [
+          -0.539,
+          1.5
+        ],
+        "dist": 0.327
+      },
+      "obstacle_3": {
+        "pos_local": [
+          -0.899,
+          -1.745
+        ],
+        "dist": 3.591
+      },
+      "obstacle_4": {
+        "pos_local": [
+          -0.8,
+          -1.0
+        ],
+        "dist": 2.839
+      },
+      "obstacle_5": {
+        "pos_local": [
+          0.7,
+          1.127
+        ],
+        "dist": 1.416
+      }
+    },
+    "lidar_min_dist": 0.301,
+    "lidar_min_ray_idx": 67
+  },
+  {
+    "episode": 354,
+    "env_id": 55,
+    "outcome": "COLL_STATIC",
+    "step_count": 295,
+    "robot_pos_local": [
+      -0.594,
+      -0.251
+    ],
+    "robot_yaw_rad": 1.253,
+    "robot_speed": 0.018,
+    "last_action": [
+      -0.91,
+      -0.99
+    ],
+    "goal_local": [
+      2.0,
+      -1.5
+    ],
+    "dist_to_goal": 2.879,
+    "closest_obstacle": "obstacle_4",
+    "closest_dist": 0.324,
+    "obstacles": {
+      "obstacle_1": {
+        "pos_local": [
+          1.25,
+          1.0
+        ],
+        "dist": 2.228
+      },
+      "obstacle_2": {
+        "pos_local": [
+          -1.07,
+          -1.556
+        ],
+        "dist": 1.389
+      },
+      "obstacle_3": {
+        "pos_local": [
+          -1.327,
+          -1.535
+        ],
+        "dist": 1.479
+      },
+      "obstacle_4": {
+        "pos_local": [
+          -0.8,
+          0.0
+        ],
+        "dist": 0.324
+      },
+      "obstacle_5": {
+        "pos_local": [
+          0.7,
+          0.032
+        ],
+        "dist": 1.325
+      }
+    },
+    "lidar_min_dist": 0.301,
+    "lidar_min_ray_idx": 32
+  },
+  {
+    "episode": 358,
+    "env_id": 14,
+    "outcome": "COLL_STATIC",
+    "step_count": 278,
+    "robot_pos_local": [
+      0.759,
+      -1.479
+    ],
+    "robot_yaw_rad": -1.383,
+    "robot_speed": 0.215,
+    "last_action": [
+      1.0,
+      -0.077
+    ],
+    "goal_local": [
+      -1.5,
+      2.0
+    ],
+    "dist_to_goal": 4.148,
+    "closest_obstacle": "obstacle_2",
+    "closest_dist": 2.092,
+    "obstacles": {
+      "obstacle_1": {
+        "pos_local": [
+          0.686,
+          1.0
+        ],
+        "dist": 2.48
+      },
+      "obstacle_2": {
+        "pos_local": [
+          0.144,
+          0.52
+        ],
+        "dist": 2.092
+      },
+      "obstacle_3": {
+        "pos_local": [
+          -0.5,
+          1.799
+        ],
+        "dist": 3.512
+      },
+      "obstacle_4": {
+        "pos_local": [
+          -0.8,
+          0.8
+        ],
+        "dist": 2.762
+      },
+      "obstacle_5": {
+        "pos_local": [
+          0.7,
+          1.3
+        ],
+        "dist": 2.78
+      }
+    },
+    "lidar_min_dist": 0.3,
+    "lidar_min_ray_idx": 0
+  },
+  {
+    "episode": 368,
+    "env_id": 2,
+    "outcome": "COLL_STATIC",
+    "step_count": 749,
+    "robot_pos_local": [
+      -0.259,
+      -1.479
+    ],
+    "robot_yaw_rad": 2.132,
+    "robot_speed": 0.216,
+    "last_action": [
+      1.0,
+      -0.887
+    ],
+    "goal_local": [
+      0.5,
+      -2.0
+    ],
+    "dist_to_goal": 0.921,
+    "closest_obstacle": "obstacle_5",
+    "closest_dist": 1.747,
+    "obstacles": {
+      "obstacle_1": {
+        "pos_local": [
+          0.878,
+          1.0
+        ],
+        "dist": 2.728
+      },
+      "obstacle_2": {
+        "pos_local": [
+          -1.933,
+          -1.981
+        ],
+        "dist": 1.747
+      },
+      "obstacle_3": {
+        "pos_local": [
+          0.228,
+          0.489
+        ],
+        "dist": 2.028
+      },
+      "obstacle_4": {
+        "pos_local": [
+          -0.8,
+          0.8
+        ],
+        "dist": 2.343
+      },
+      "obstacle_5": {
+        "pos_local": [
+          0.7,
+          -0.019
+        ],
+        "dist": 1.747
+      }
+    },
+    "lidar_min_dist": 0.301,
+    "lidar_min_ray_idx": 47
+  },
+  {
+    "episode": 375,
+    "env_id": 21,
+    "outcome": "TIMEOUT",
+    "step_count": 1500,
+    "robot_pos_local": [
+      0.66,
+      0.409
+    ],
+    "robot_yaw_rad": 0.447,
+    "robot_speed": 0.215,
+    "last_action": [
+      1.0,
+      0.017
+    ],
+    "goal_local": [
+      -2.0,
+      1.8
+    ],
+    "dist_to_goal": 3.002,
+    "closest_obstacle": "obstacle_5",
+    "closest_dist": 0.61,
+    "obstacles": {
+      "obstacle_1": {
+        "pos_local": [
+          1.478,
+          1.0
+        ],
+        "dist": 1.009
+      },
+      "obstacle_2": {
+        "pos_local": [
+          -0.537,
+          -1.037
+        ],
+        "dist": 1.876
+      },
+      "obstacle_3": {
+        "pos_local": [
+          -0.082,
+          0.374
+        ],
+        "dist": 0.743
+      },
+      "obstacle_4": {
+        "pos_local": [
+          -0.8,
+          0.487
+        ],
+        "dist": 1.462
+      },
+      "obstacle_5": {
+        "pos_local": [
+          0.7,
+          -0.2
+        ],
+        "dist": 0.61
+      }
+    },
+    "lidar_min_dist": 0.516,
+    "lidar_min_ray_idx": 68
+  },
+  {
+    "episode": 390,
+    "env_id": 37,
+    "outcome": "COLL_DYNAMIC",
+    "step_count": 329,
+    "robot_pos_local": [
+      -0.046,
+      -1.564
+    ],
+    "robot_yaw_rad": -0.394,
+    "robot_speed": 0.164,
+    "last_action": [
+      -0.351,
+      1.0
+    ],
+    "goal_local": [
+      -2.0,
+      -0.8
+    ],
+    "dist_to_goal": 2.098,
+    "closest_obstacle": "obstacle_3",
+    "closest_dist": 0.328,
+    "obstacles": {
+      "obstacle_1": {
+        "pos_local": [
+          -0.838,
+          1.0
+        ],
+        "dist": 2.684
+      },
+      "obstacle_2": {
+        "pos_local": [
+          -1.336,
+          1.307
+        ],
+        "dist": 3.148
+      },
+      "obstacle_3": {
+        "pos_local": [
+          0.273,
+          -1.639
+        ],
+        "dist": 0.328
+      },
+      "obstacle_4": {
+        "pos_local": [
+          -0.8,
+          -1.0
+        ],
+        "dist": 0.942
+      },
+      "obstacle_5": {
+        "pos_local": [
+          0.7,
+          1.052
+        ],
+        "dist": 2.72
+      }
+    },
+    "lidar_min_dist": 0.304,
+    "lidar_min_ray_idx": 87
+  },
+  {
+    "episode": 392,
+    "env_id": 61,
+    "outcome": "COLL_DYNAMIC",
+    "step_count": 333,
+    "robot_pos_local": [
+      -0.179,
+      -1.412
+    ],
+    "robot_yaw_rad": -0.036,
+    "robot_speed": 0.069,
+    "last_action": [
+      0.061,
+      1.0
+    ],
+    "goal_local": [
+      -1.0,
+      -2.0
+    ],
+    "dist_to_goal": 1.01,
+    "closest_obstacle": "obstacle_3",
+    "closest_dist": 0.323,
+    "obstacles": {
+      "obstacle_1": {
+        "pos_local": [
+          1.095,
+          1.0
+        ],
+        "dist": 2.728
+      },
+      "obstacle_2": {
+        "pos_local": [
+          1.5,
+          -1.06
+        ],
+        "dist": 1.716
+      },
+      "obstacle_3": {
+        "pos_local": [
+          0.027,
+          -1.661
+        ],
+        "dist": 0.323
+      },
+      "obstacle_4": {
+        "pos_local": [
+          -0.8,
+          -0.841
+        ],
+        "dist": 0.844
+      },
+      "obstacle_5": {
+        "pos_local": [
+          0.7,
+          0.549
+        ],
+        "dist": 2.149
+      }
+    },
+    "lidar_min_dist": 0.301,
+    "lidar_min_ray_idx": 77
+  },
+  {
+    "episode": 398,
+    "env_id": 22,
+    "outcome": "COLL_DYNAMIC",
+    "step_count": 388,
+    "robot_pos_local": [
+      -1.156,
+      1.375
+    ],
+    "robot_yaw_rad": 1.319,
+    "robot_speed": 0.215,
+    "last_action": [
+      1.0,
+      0.966
+    ],
+    "goal_local": [
+      -1.5,
+      2.0
+    ],
+    "dist_to_goal": 0.713,
+    "closest_obstacle": "obstacle_2",
+    "closest_dist": 0.416,
+    "obstacles": {
+      "obstacle_1": {
+        "pos_local": [
+          1.988,
+          1.976
+        ],
+        "dist": 3.201
+      },
+      "obstacle_2": {
+        "pos_local": [
+          -1.568,
+          1.43
+        ],
+        "dist": 0.416
+      },
+      "obstacle_3": {
+        "pos_local": [
+          0.043,
+          0.522
+        ],
+        "dist": 1.472
+      },
+      "obstacle_4": {
+        "pos_local": [
+          -0.8,
+          -1.0
+        ],
+        "dist": 2.401
+      },
+      "obstacle_5": {
+        "pos_local": [
+          0.7,
+          -0.2
+        ],
+        "dist": 2.434
+      }
+    },
+    "lidar_min_dist": 0.3,
+    "lidar_min_ray_idx": 5
+  },
+  {
+    "episode": 401,
+    "env_id": 23,
+    "outcome": "COLL_DYNAMIC",
+    "step_count": 452,
+    "robot_pos_local": [
+      -1.084,
+      0.993
+    ],
+    "robot_yaw_rad": -0.651,
+    "robot_speed": 0.004,
+    "last_action": [
+      -0.999,
+      -1.0
+    ],
+    "goal_local": [
+      -1.5,
+      2.0
+    ],
+    "dist_to_goal": 1.09,
+    "closest_obstacle": "obstacle_2",
+    "closest_dist": 0.323,
+    "obstacles": {
+      "obstacle_1": {
+        "pos_local": [
+          -1.531,
+          0.694
+        ],
+        "dist": 0.538
+      },
+      "obstacle_2": {
+        "pos_local": [
+          -1.258,
+          1.265
+        ],
+        "dist": 0.323
+      },
+      "obstacle_3": {
+        "pos_local": [
+          -1.301,
+          -1.495
+        ],
+        "dist": 2.498
+      },
+      "obstacle_4": {
+        "pos_local": [
+          -0.8,
+          -0.913
+        ],
+        "dist": 1.927
+      },
+      "obstacle_5": {
+        "pos_local": [
+          0.7,
+          -0.2
+        ],
+        "dist": 2.146
+      }
+    },
+    "lidar_min_dist": 0.301,
+    "lidar_min_ray_idx": 31
+  },
+  {
+    "episode": 403,
+    "env_id": 54,
+    "outcome": "COLL_DYNAMIC",
+    "step_count": 94,
+    "robot_pos_local": [
+      -0.165,
+      0.442
+    ],
+    "robot_yaw_rad": 2.261,
+    "robot_speed": 0.121,
+    "last_action": [
+      -0.531,
+      0.35
+    ],
+    "goal_local": [
+      0.0,
+      2.0
+    ],
+    "dist_to_goal": 1.567,
+    "closest_obstacle": "obstacle_3",
+    "closest_dist": 0.323,
+    "obstacles": {
+      "obstacle_1": {
+        "pos_local": [
+          -1.645,
+          -0.45
+        ],
+        "dist": 1.728
+      },
+      "obstacle_2": {
+        "pos_local": [
+          -0.402,
+          -0.154
+        ],
+        "dist": 0.642
+      },
+      "obstacle_3": {
+        "pos_local": [
+          -0.242,
+          0.128
+        ],
+        "dist": 0.323
+      },
+      "obstacle_4": {
+        "pos_local": [
+          -0.8,
+          -0.608
+        ],
+        "dist": 1.227
+      },
+      "obstacle_5": {
+        "pos_local": [
+          0.7,
+          -0.2
+        ],
+        "dist": 1.077
+      }
+    },
+    "lidar_min_dist": 0.302,
+    "lidar_min_ray_idx": 64
+  },
+  {
+    "episode": 406,
+    "env_id": 13,
+    "outcome": "COLL_STATIC",
+    "step_count": 937,
+    "robot_pos_local": [
+      -0.258,
+      -1.489
+    ],
+    "robot_yaw_rad": 2.164,
+    "robot_speed": 0.219,
+    "last_action": [
+      1.0,
+      -0.835
+    ],
+    "goal_local": [
+      1.5,
+      0.8
+    ],
+    "dist_to_goal": 2.886,
+    "closest_obstacle": "obstacle_4",
+    "closest_dist": 1.685,
+    "obstacles": {
+      "obstacle_1": {
+        "pos_local": [
+          -0.268,
+          1.0
+        ],
+        "dist": 2.489
+      },
+      "obstacle_2": {
+        "pos_local": [
+          0.152,
+          0.863
+        ],
+        "dist": 2.387
+      },
+      "obstacle_3": {
+        "pos_local": [
+          0.377,
+          0.221
+        ],
+        "dist": 1.824
+      },
+      "obstacle_4": {
+        "pos_local": [
+          -0.8,
+          0.107
+        ],
+        "dist": 1.685
+      },
+      "obstacle_5": {
+        "pos_local": [
+          0.7,
+          0.381
+        ],
+        "dist": 2.101
+      }
+    },
+    "lidar_min_dist": 0.301,
+    "lidar_min_ray_idx": 46
+  },
+  {
+    "episode": 411,
+    "env_id": 62,
+    "outcome": "COLL_STATIC",
+    "step_count": 765,
+    "robot_pos_local": [
+      -0.256,
+      -2.086
+    ],
+    "robot_yaw_rad": -2.921,
+    "robot_speed": 0.164,
+    "last_action": [
+      -0.859,
+      0.992
+    ],
+    "goal_local": [
+      1.5,
+      -1.8
+    ],
+    "dist_to_goal": 1.779,
+    "closest_obstacle": "obstacle_3",
+    "closest_dist": 0.404,
+    "obstacles": {
+      "obstacle_1": {
+        "pos_local": [
+          1.211,
+          1.0
+        ],
+        "dist": 3.417
+      },
+      "obstacle_2": {
+        "pos_local": [
+          -1.657,
+          1.477
+        ],
+        "dist": 3.829
+      },
+      "obstacle_3": {
+        "pos_local": [
+          -0.222,
+          -1.684
+        ],
+        "dist": 0.404
+      },
+      "obstacle_4": {
+        "pos_local": [
+          -0.8,
+          -1.0
+        ],
+        "dist": 1.215
+      },
+      "obstacle_5": {
+        "pos_local": [
+          0.7,
+          -0.2
+        ],
+        "dist": 2.114
+      }
+    },
+    "lidar_min_dist": 0.302,
+    "lidar_min_ray_idx": 45
+  },
+  {
+    "episode": 432,
+    "env_id": 56,
+    "outcome": "TIMEOUT",
+    "step_count": 1500,
+    "robot_pos_local": [
+      1.312,
+      1.81
+    ],
+    "robot_yaw_rad": 2.855,
+    "robot_speed": 0.215,
+    "last_action": [
+      1.0,
+      0.072
+    ],
+    "goal_local": [
+      -2.0,
+      1.8
+    ],
+    "dist_to_goal": 3.312,
+    "closest_obstacle": "obstacle_1",
+    "closest_dist": 0.562,
+    "obstacles": {
+      "obstacle_1": {
+        "pos_local": [
+          1.704,
+          1.408
+        ],
+        "dist": 0.562
+      },
+      "obstacle_2": {
+        "pos_local": [
+          0.692,
+          0.229
+        ],
+        "dist": 1.698
+      },
+      "obstacle_3": {
+        "pos_local": [
+          0.229,
+          -1.643
+        ],
+        "dist": 3.619
+      },
+      "obstacle_4": {
+        "pos_local": [
+          -0.8,
+          0.193
+        ],
+        "dist": 2.66
+      },
+      "obstacle_5": {
+        "pos_local": [
+          0.7,
+          1.3
+        ],
+        "dist": 0.797
+      }
+    },
+    "lidar_min_dist": 0.476,
+    "lidar_min_ray_idx": 78
+  },
+  {
+    "episode": 439,
+    "env_id": 33,
+    "outcome": "COLL_DYNAMIC",
+    "step_count": 330,
+    "robot_pos_local": [
+      -0.019,
+      -1.601
+    ],
+    "robot_yaw_rad": 0.361,
+    "robot_speed": 0.019,
+    "last_action": [
+      -0.885,
+      0.996
+    ],
+    "goal_local": [
+      0.0,
+      2.0
+    ],
+    "dist_to_goal": 3.601,
+    "closest_obstacle": "obstacle_3",
+    "closest_dist": 0.324,
+    "obstacles": {
+      "obstacle_1": {
+        "pos_local": [
+          1.875,
+          1.749
+        ],
+        "dist": 3.849
+      },
+      "obstacle_2": {
+        "pos_local": [
+          0.3,
+          0.437
+        ],
+        "dist": 2.064
+      },
+      "obstacle_3": {
+        "pos_local": [
+          0.303,
+          -1.636
+        ],
+        "dist": 0.324
+      },
+      "obstacle_4": {
+        "pos_local": [
+          -0.8,
+          -1.0
+        ],
+        "dist": 0.986
+      },
+      "obstacle_5": {
+        "pos_local": [
+          0.7,
+          -0.2
+        ],
+        "dist": 1.575
+      }
+    },
+    "lidar_min_dist": 0.303,
+    "lidar_min_ray_idx": 89
+  },
+  {
+    "episode": 457,
+    "env_id": 58,
+    "outcome": "COLL_DYNAMIC",
+    "step_count": 618,
+    "robot_pos_local": [
+      -1.092,
+      1.064
+    ],
+    "robot_yaw_rad": 1.678,
+    "robot_speed": 0.05,
+    "last_action": [
+      -0.821,
+      -1.0
+    ],
+    "goal_local": [
+      -2.0,
+      -0.8
+    ],
+    "dist_to_goal": 2.073,
+    "closest_obstacle": "obstacle_2",
+    "closest_dist": 0.322,
+    "obstacles": {
+      "obstacle_1": {
+        "pos_local": [
+          -0.554,
+          1.0
+        ],
+        "dist": 0.542
+      },
+      "obstacle_2": {
+        "pos_local": [
+          -1.315,
+          1.296
+        ],
+        "dist": 0.322
+      },
+      "obstacle_3": {
+        "pos_local": [
+          -0.47,
+          1.796
+        ],
+        "dist": 0.961
+      },
+      "obstacle_4": {
+        "pos_local": [
+          -0.8,
+          -1.0
+        ],
+        "dist": 2.085
+      },
+      "obstacle_5": {
+        "pos_local": [
+          0.7,
+          -0.2
+        ],
+        "dist": 2.193
+      }
+    },
+    "lidar_min_dist": 0.3,
+    "lidar_min_ray_idx": 33
+  },
+  {
+    "episode": 475,
+    "env_id": 47,
+    "outcome": "TIMEOUT",
+    "step_count": 1500,
+    "robot_pos_local": [
+      1.889,
+      -1.328
+    ],
+    "robot_yaw_rad": 1.717,
+    "robot_speed": 0.164,
+    "last_action": [
+      0.569,
+      0.131
+    ],
+    "goal_local": [
+      1.5,
+      -1.8
+    ],
+    "dist_to_goal": 0.612,
+    "closest_obstacle": "obstacle_2",
+    "closest_dist": 0.686,
+    "obstacles": {
+      "obstacle_1": {
+        "pos_local": [
+          -1.564,
+          0.357
+        ],
+        "dist": 3.843
+      },
+      "obstacle_2": {
+        "pos_local": [
+          1.5,
+          -1.893
+        ],
+        "dist": 0.686
+      },
+      "obstacle_3": {
+        "pos_local": [
+          0.128,
+          0.669
+        ],
+        "dist": 2.663
+      },
+      "obstacle_4": {
+        "pos_local": [
+          -0.8,
+          -1.0
+        ],
+        "dist": 2.709
+      },
+      "obstacle_5": {
+        "pos_local": [
+          0.7,
+          -0.2
+        ],
+        "dist": 1.639
+      }
+    },
+    "lidar_min_dist": 0.524,
+    "lidar_min_ray_idx": 0
+  },
+  {
+    "episode": 495,
+    "env_id": 45,
+    "outcome": "TIMEOUT",
+    "step_count": 1500,
+    "robot_pos_local": [
+      -1.938,
+      -0.203
+    ],
+    "robot_yaw_rad": -1.533,
+    "robot_speed": 0.197,
+    "last_action": [
+      0.83,
+      -0.053
+    ],
+    "goal_local": [
+      0.5,
+      1.5
+    ],
+    "dist_to_goal": 2.974,
+    "closest_obstacle": "obstacle_4",
+    "closest_dist": 1.141,
+    "obstacles": {
+      "obstacle_1": {
+        "pos_local": [
+          1.338,
+          1.0
+        ],
+        "dist": 3.489
+      },
+      "obstacle_2": {
+        "pos_local": [
+          -0.741,
+          0.991
+        ],
+        "dist": 1.69
+      },
+      "obstacle_3": {
+        "pos_local": [
+          1.101,
+          -1.564
+        ],
+        "dist": 3.33
+      },
+      "obstacle_4": {
+        "pos_local": [
+          -0.8,
+          -0.289
+        ],
+        "dist": 1.141
+      },
+      "obstacle_5": {
+        "pos_local": [
+          0.7,
+          -0.2
+        ],
+        "dist": 2.638
+      }
+    },
+    "lidar_min_dist": 0.441,
+    "lidar_min_ray_idx": 0
+  }
+]

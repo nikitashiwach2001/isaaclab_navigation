@@ -1587,3 +1587,177 @@ COLL_BOUNDARY:  1        (0.07%)
 TIMEOUT:        5        (0.33%)
 
 
+
+STAGE7_SPEED_RANDOMIZE=1 OBSTACLE_SPEED_SCALE=2.0 \
+python scripts/train_td3.py \
+  --task IsaaclabScene-Stage7-v0 \
+  --num_envs 128 --total_steps 3000000 \
+  --hidden_dim 512 --use_conv --privileged_critic \
+  --actor_lr 0.00003 --critic_lr 0.001 \
+  --batch_size 512 --buffer_size 2000000 \
+  --policy_noise 0.2 --noise_clip 0.5 --policy_delay 4 --expl_noise 0.15 \
+  --save_interval 500000 \
+  --load_checkpoint logs/may_21/stage5_mixedspawn_scale1/20260521_072312/td3_step_3500032.pt \
+  --run_name may_XX/stage7_corridor_finetune --headless
+
+
+========== EVALUATION SUMMARY ========== scale 2
+==========================================
+Checkpoint: logs/may_26/stage6_finetune_scale2_safe_1M/20260526_074945/td3_step_700032.pt
+Total episodes: 500
+SUCCESS:        462      (92.40%)
+COLL_DYNAMIC:   8        (1.60%)
+COLL_STATIC:    5        (1.00%)
+COLL_BOUNDARY:  3        (0.60%)
+TIMEOUT:        22       (4.40%)
+Wrote 38 failure records to stage5_on_stage6.json
+By closest obstacle:  {'obstacle_3': 8, 'obstacle_1': 8, 'obstacle_2': 7, 'obstacle_4': 11, 'obstacle_5': 4}
+By outcome:           {'COLL_STATIC': 5, 'COLL_DYNAMIC': 8, 'COLL_BOUNDARY': 3, 'TIMEOUT': 22}
+By location:          {'near_exit': 7, 'mid_corridor': 17, 'back_corridor': 9, 'goal_area': 5}
+Frozen-near-obstacle: 3/38  (7.9%)
+Rushing-into-obstacle: 5/38  (13.2%)
+Avg robot speed:      0.161 m/s
+Avg action linear:    0.466
+Avg |action angular|: 0.517
+
+========== EVALUATION SUMMARY ========== scale 1
+Checkpoint: logs/may_26/stage6_finetune_scale1p5_1M/20260526_081719/td3_step_200064.pt
+Total episodes: 500
+SUCCESS:        447      (89.40%)
+COLL_DYNAMIC:   22       (4.40%)
+COLL_STATIC:    17       (3.40%)
+COLL_BOUNDARY:  1        (0.20%)
+TIMEOUT:        13       (2.60%)
+Wrote 53 failure records to stage5_on_stage6.json
+By closest obstacle:  {'obstacle_2': 11, 'obstacle_3': 22, 'obstacle_4': 6, 'obstacle_5': 11, 'obstacle_1': 3}
+By outcome:           {'COLL_STATIC': 17, 'COLL_DYNAMIC': 22, 'TIMEOUT': 13, 'COLL_BOUNDARY': 1}
+By location:          {'near_exit': 17, 'mid_corridor': 24, 'back_corridor': 4, 'goal_area': 8}
+Frozen-near-obstacle: 7/53  (13.2%)
+Rushing-into-obstacle: 14/53  (26.4%)
+Avg robot speed:      0.170 m/s
+Avg action linear:    0.560
+Avg |action angular|: 0.569
+==========================================
+Checkpoint: logs/may_26/stage6_finetune_scale1p5_1M/20260526_081719/td3_step_600064.pt
+Total episodes: 500
+SUCCESS:        451      (90.20%)
+COLL_DYNAMIC:   16       (3.20%)
+COLL_STATIC:    25       (5.00%)
+COLL_BOUNDARY:  1        (0.20%)
+TIMEOUT:        7        (1.40%)
+Wrote 49 failure records to stage5_on_stage6.json
+By closest obstacle:  {'obstacle_5': 13, 'obstacle_4': 8, 'obstacle_1': 1, 'obstacle_3': 18, 'obstacle_2': 9}
+By outcome:           {'COLL_STATIC': 25, 'COLL_DYNAMIC': 16, 'TIMEOUT': 7, 'COLL_BOUNDARY': 1}
+By location:          {'near_exit': 17, 'mid_corridor': 26, 'back_corridor': 3, 'goal_area': 3}
+Frozen-near-obstacle: 7/49  (14.3%)
+Rushing-into-obstacle: 6/49  (12.2%)
+Avg robot speed:      0.155 m/s
+Avg action linear:    0.472
+Avg |action angular|: 0.549
+========================================
+Checkpoint: logs/may_26/stage6_finetune_scale1p5_1M/20260526_081719/td3_step_400000.pt
+Total episodes: 500
+SUCCESS:        456      (91.20%)
+COLL_DYNAMIC:   18       (3.60%)
+COLL_STATIC:    14       (2.80%)
+TIMEOUT:        12       (2.40%)
+Wrote 44 failure records to stage5_on_stage6.json
+By closest obstacle:  {'obstacle_2': 3, 'obstacle_1': 7, 'obstacle_4': 5, 'obstacle_5': 12, 'obstacle_3': 17}
+By outcome:           {'COLL_STATIC': 14, 'COLL_DYNAMIC': 18, 'TIMEOUT': 12}
+By location:          {'near_exit': 9, 'mid_corridor': 25, 'goal_area': 6, 'back_corridor': 4}
+Frozen-near-obstacle: 9/44  (20.5%)
+Rushing-into-obstacle: 8/44  (18.2%)
+Avg robot speed:      0.151 m/s
+Avg action linear:    0.440
+Avg |action angular|: 0.530
+==========================================
+
+LIDAR_STACK_FRAMES=6 OBSTACLE_SPEED_SCALE=2.0 python scripts/train_td3.py   
+--task IsaaclabScene-Stage6-v0   --num_envs 128 --total_steps 1500000  
+--start_steps 1000   --hidden_dim 512 --use_conv --privileged_critic   
+--actor_lr 0.00003 --critic_lr 0.0002   --batch_size 512 --buffer_size 2000000  
+--policy_noise 0.2 --noise_clip 0.5 --policy_delay 4 --expl_noise 0.06   
+--save_interval 100000  
+--load_checkpoint logs/may_26/stage6_finetune_scale3_1p5M/20260526_072121/td3_final.pt   
+--run_name may_26/stage6_finetune_scale2_safe_1M   --headless
+
+
+LIDAR_STACK_FRAMES=6 OBSTACLE_SPEED_SCALE=1.0 STAGE5_OBSTACLE_PHASE_RESET=0 \
+python scripts/play_td3_planner.py \
+  --task IsaaclabScene-Stage5-v0 \
+  --num_envs 16 \
+  --checkpoint logs/may_26/stage6_finetune_scale2_safe_1M/20260526_074945/td3_step_700032.pt \
+  --hidden_dim 512 --use_conv \
+  --eval_episodes 200 \
+  --inflate 0.4 \
+  --replan_every 3 \
+  --switch_radius 0.20 \
+  --waypoint_spacing 0.25 \
+  --headless
+
+
+LIDAR_STACK_FRAMES=6 OBSTACLE_SPEED_SCALE=1.0 STAGE6_OBSTACLE_PHASE_RESET=0 python scripts/play_td3_planner.py   
+--task IsaaclabScene-Stage6-v0   
+--num_envs 1   
+--checkpoint logs/may_26/stage6_finetune_scale2_safe_1M/20260526_074945/td3_step_700032.pt   
+--hidden_dim 512 
+--use_conv   
+--eval_episodes 200  
+--inflate 0.30  
+--block_radius 0.18   --cluster_dist 0.30   --replan_every 3   --replan_lookahead_m 1.5   --switch_radius 0.20   --waypoint_spacing 0.25   --show_path
+
+logs/may_26/stage6_finetune_scale2_safe_1M/20260526_074945/td3_step_700032.pt
+
+
+==============================================================================
+==============================================================================
+==============================================================================
+
+ROBOT=ictbot LIDAR_STACK_FRAMES=6 OBSTACLE_SPEED_SCALE=1.0 STAGE5_OBSTACLE_PHASE_RESET=0 \
+python scripts/play_td3.py \
+  --task IsaaclabScene-Stage5-v0 \
+  --num_envs 16 \
+  --checkpoint llogs/ict_bot/stage5_ictbot_scale2to1_keepcritic/20260528_070534/td3_step_500096.pt \
+  --use_conv --hidden_dim 512 \
+  --eval_episodes 200
+
+
+with planner and cmd was
+ROBOT=ictbot LIDAR_STACK_FRAMES=6 OBSTACLE_SPEED_SCALE=1.5 STAGE6_OBSTACLE_PHASE_RESET=0 
+python scripts/play_td3_planner.py   
+--task IsaaclabScene-Stage6a-v0 --num_envs 32  
+--checkpoint logs/ict_bot/stage5_ictbot_orbit_finetune/20260528_081745/td3_final.pt   
+--use_conv --hidden_dim 512 --eval_episodes 100   --inflate 0.30 --block_radius 0.40 
+--cluster_dist 0.30   --replan_every 2 --replan_lookahead_m 2.5 --proximity_replan_m 0.8   
+--switch_radius 0.20 --waypoint_spacing 0.10   --episode_length_s 90.0 
+--no_progress_timeout_s 15.0   --headless
+========== PLANNER EVAL SUMMARY ==========
+Total episodes: 100
+SUCCESS:       83   (83.0%)
+  └─ clean:    61   (61.0%)
+  └─ recovered:22   (22.0%)
+STUCK:         2    (2.0%)
+STALLED:       11   (11.0%)
+TUMBLE:        1    (1.0%)
+TIMEOUT:       3    (3.0%)
+NO_PATH:       2    (planner failed to route)
+contacts total 72  |  episodes with a nose-pin: 2
+==========================================
+
+without planner
+Checkpoint: logs/ict_bot/stage5_ictbot_orbit_finetune/20260528_081745/td3_final.pt
+Total episodes: 100
+SUCCESS:        34       (34.00%)
+COLL_DYNAMIC:   66       (66.00%)
+
+
+ROBOT=ictbot LIDAR_STACK_FRAMES=6 OBSTACLE_SPEED_SCALE=1.5 STAGE6_OBSTACLE_PHASE_RESET=0 \
+python scripts/play_td3_planner.py \
+  --task IsaaclabScene-Stage6a-v0 --num_envs 1 \
+  --checkpoint logs/ict_bot/stage5_ictbot_orbit_finetune/20260528_081745/td3_final.pt \
+  --use_conv --hidden_dim 512 --eval_episodes 100 \
+  --inflate 0.30 --block_radius 0.40 --cluster_dist 0.30 \
+  --replan_every 2 --replan_lookahead_m 2.5 --proximity_replan_m 1.2 \
+  --switch_radius 0.25 --waypoint_spacing 0.10 \
+  --episode_length_s 90.0 --no_progress_timeout_s 25.0 \
+  --enable_backward_recovery 

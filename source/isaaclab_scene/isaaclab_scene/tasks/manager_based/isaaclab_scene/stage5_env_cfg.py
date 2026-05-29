@@ -8,7 +8,7 @@ from isaaclab.utils import configclass
 from . import mdp
 
 from .isaaclab_scene_env_cfg import BaseSceneCfg, BaseEventsCfg, BaseEnvCfg
-from .mdp.rewards import Stage4RewardsCfgV2
+from .mdp.rewards import Stage4RewardsCfgV2, Stage4RewardsCfgV2Orbit, Stage4RewardsCfgV2Smooth
 from .mdp.stage_5.obstacles import (
     STAGE5_OBSTACLE_1_CFG,
     STAGE5_OBSTACLE_2_CFG,
@@ -126,5 +126,25 @@ class Stage5MixedSpawnEnvCfg(Stage5EnvCfg):
     differs. The finetune target for the random-spawn Stage 4 checkpoint."""
 
     events: Stage5MixedSpawnEventsCfg = Stage5MixedSpawnEventsCfg()
+
+
+@configclass
+class Stage5MixedSpawnOrbitEnvCfg(Stage5MixedSpawnEnvCfg):
+    """Stage 5 mixed-spawn + orbit-penalty reward variant.
+    Same scene/events as Stage5MixedSpawnEnvCfg; only the reward differs.
+    Used to finetune a policy whose dodge collapses into spinning around
+    obstacles instead of side-weaving past them."""
+
+    rewards: Stage4RewardsCfgV2Orbit = Stage4RewardsCfgV2Orbit()
+
+
+@configclass
+class Stage5MixedSpawnSmoothEnvCfg(Stage5MixedSpawnEnvCfg):
+    """Stage 5 mixed-spawn + orbit penalty + gap-through bonus.
+    Same scene/events as Stage5MixedSpawnEnvCfg; only the reward differs.
+    The "best behavior" finetune target — stops orbiting AND pays for
+    side-weave, so the policy translates past obstacles smoothly."""
+
+    rewards: Stage4RewardsCfgV2Smooth = Stage4RewardsCfgV2Smooth()
 
 

@@ -114,12 +114,12 @@ _OBS3_TIMES = [t * OBSTACLE_SPEED_SCALE for t in _OBS3_TIMES_BASE]
 _OBS3_PERIOD = _OBS3_TIMES_BASE[-1] * OBSTACLE_SPEED_SCALE
 
 # Obstacle 3 — eval-only blocking diagnostic (STAGE5_OBS3_BLOCK=1): obstacle_3
-# holds a point ahead of the robot ON the robot->goal line, then freezes once the
-# robot is partway there — a dead blocker squarely on the path, every episode.
+# runs a fully scripted motion — hold at env.blk_start, then after a short wait
+# move in a straight line to env.blk_stop and stop. blk_start / blk_stop are set
+# by the planner demo; obstacle_3 never reads the robot, so it cannot chase it.
 _OBS3_BLOCK = os.environ.get("STAGE5_OBS3_BLOCK", "0") == "1"
-_OBS3_BLOCK_SPEED = 0.35             # m/s — fast enough to hold position ahead of the robot
-_OBS3_BLOCK_LEAD = 1.2               # m — parks this far ahead of the robot on the goal line
-_OBS3_BLOCK_FREEZE_PROGRESS = 0.35   # freezes once the robot is this fraction of the way to the goal
+_OBS3_BLOCK_SPEED = 0.30        # m/s — straight-line move-in speed
+_OBS3_BLOCK_WAIT_S = 1.5        # s — wait at the start point before moving in
 
 
 # ── Interpolation helper ──────────────────────────────────────────────────────
@@ -166,53 +166,32 @@ def _move_obstacle(env, name: str, time: torch.Tensor, times: list, xy: list):
 
 
 def _block_update_obstacle_3(env):
-    """Eval-only (STAGE5_OBS3_BLOCK=1): obstacle_3 holds a point ahead of the
-    robot on the robot->goal line, then freezes once the robot is partway there —
-    a dead blocker squarely on the path, every episode."""
-    obs   = env.scene["obstacle_3"]
-    robot = env.scene["robot"]
+    """Eval-only (STAGE5_OBS3_BLOCK=1): obstacle_3 runs a scripted motion — hold
+    at env.blk_start, then after a short wait move in a straight line to
+    env.blk_stop and stop there. Robot-independent (it cannot chase the robot).
+    No-op until the planner demo provides blk_start / blk_stop."""
+    if not hasattr(env, "blk_stop"):
+        return
+    obs = env.scene["obstacle_3"]
     n, dev = env.num_envs, env.device
 
-    robot_xy = robot.data.root_pos_w[:, :2]
-    goal_xy  = env.goal_pos_w
-
-    if not hasattr(env, "s5_obs3_frozen"):
-        env.s5_obs3_frozen = torch.zeros(n, dtype=torch.bool, device=dev)
-        env.s5_obs3_d0     = torch.ones(n, device=dev)
-
-    to_goal   = goal_xy - robot_xy
-    dist_goal = torch.norm(to_goal, dim=-1, keepdim=True).clamp(min=1e-6)
-    dir_goal  = to_goal / dist_goal
-
-    # block point: on the robot->goal line, _OBS3_BLOCK_LEAD ahead of the robot
-    lead     = torch.clamp(dist_goal - 0.3, min=0.0, max=_OBS3_BLOCK_LEAD)
-    block_pt = robot_xy + dir_goal * lead
-
-    # episode reset: unfreeze and record the initial robot->goal distance
     if hasattr(env, "episode_length_buf"):
         reset = env.episode_length_buf <= 1
+        wait_steps = max(int(_OBS3_BLOCK_WAIT_S / max(env.step_dt, 1e-6)), 1)
+        moving = env.episode_length_buf > wait_steps
     else:
         reset = torch.zeros(n, dtype=torch.bool, device=dev)
-    if reset.any():
-        env.s5_obs3_frozen = env.s5_obs3_frozen.clone()
-        env.s5_obs3_d0     = env.s5_obs3_d0.clone()
-        env.s5_obs3_frozen[reset] = False
-        env.s5_obs3_d0[reset]     = dist_goal.squeeze(-1)[reset].clamp(min=0.5)
+        moving = torch.ones(n, dtype=torch.bool, device=dev)
 
-    # freeze once the robot is far enough along to its goal
-    progress = 1.0 - dist_goal.squeeze(-1) / env.s5_obs3_d0
-    env.s5_obs3_frozen = env.s5_obs3_frozen | (progress >= _OBS3_BLOCK_FREEZE_PROGRESS)
+    # reset envs snap to the start point; others continue from where they are
+    cur = torch.where(reset.unsqueeze(-1), env.blk_start, obs.data.root_pos_w[:, :2])
 
-    # reset envs snap straight onto the block point; others home in on it
-    cur   = torch.where(reset.unsqueeze(-1), block_pt, obs.data.root_pos_w[:, :2])
-    to_bp = block_pt - cur
-    d     = torch.norm(to_bp, dim=-1, keepdim=True).clamp(min=1e-6)
-    move  = to_bp / d * torch.clamp(d, max=_OBS3_BLOCK_SPEED * env.step_dt)
-    new_xy = torch.where(env.s5_obs3_frozen.unsqueeze(-1), cur, cur + move)
-
-    # keep inside the arena (local ±2.3 around each env origin)
-    origin = env.scene.env_origins[:, :2]
-    new_xy = (new_xy - origin).clamp(-2.3, 2.3) + origin
+    # after the wait: move straight toward the stop point (stops once reached)
+    to_stop = env.blk_stop - cur
+    d = torch.norm(to_stop, dim=-1, keepdim=True).clamp(min=1e-6)
+    step = torch.clamp(d, max=_OBS3_BLOCK_SPEED * env.step_dt)
+    moved = cur + to_stop / d * step
+    new_xy = torch.where(moving.unsqueeze(-1), moved, cur)
 
     pos_w = torch.cat([new_xy, torch.full((n, 1), 0.25, device=dev)], dim=-1)
     vel_xyz = (pos_w - obs.data.root_pos_w) / max(env.step_dt, 1e-6)

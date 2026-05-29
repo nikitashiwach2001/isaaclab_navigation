@@ -1156,6 +1156,8 @@ def navigation_reward_stage4_v2(env: ManagerBasedRLEnv) -> torch.Tensor:
         torch.full_like(goal_dist, -2.0),
         torch.zeros_like(goal_dist))
 
+
+
     # ── 7. Clearance recovery ─────────────────────────────────────────────────
     clearance_delta = min_obstacle_dist - env.prev_min_obstacle_dist
     env.prev_min_obstacle_dist[:] = min_obstacle_dist
@@ -1229,6 +1231,115 @@ def navigation_reward_stage4_v2(env: ManagerBasedRLEnv) -> torch.Tensor:
 @configclass
 class Stage4RewardsCfgV2:
     navigation = RewTerm(func=navigation_reward_stage4_v2, weight=1.0)
+
+
+# ──────────────────────────── Orbit-penalty variant ────────────────────────────
+# Same shaped reward as v2 plus an explicit penalty for the "spin in front of an
+# obstacle" failure mode (low forward speed + high yaw rate, far from goal, with
+# lateral escape room available). Targets the orbit-dodge behavior without
+# changing any other signal — every existing reward term stays identical.
+
+_ORBIT_SPEED_THRESH    = 0.05    # m/s — below this counts as "barely moving"
+_ORBIT_YAWRATE_THRESH  = 1.0     # rad/s — above this counts as "spinning"
+_ORBIT_GOAL_GUARD      = 0.5     # m — don't penalize spin when robot is near goal
+_ORBIT_PENALTY         = -3.0    # per step when the orbit condition fires
+
+
+def navigation_reward_stage4_v2_orbit(env: ManagerBasedRLEnv) -> torch.Tensor:
+    """Stage 4/5 reward v2 + orbit penalty.
+
+    Identical to navigation_reward_stage4_v2 except for the added r_orbit term:
+    when the robot is barely translating (|v| < _ORBIT_SPEED_THRESH) but spinning
+    fast (|ω| > _ORBIT_YAWRATE_THRESH), far from goal, and not actually corner-
+    trapped (at least one side is open), it pays a flat -3.0/step penalty.
+
+    Uses |body-XY velocity| (not body-X) so detection is robot-frame agnostic
+    — works for TurtleBot (forward=+X) and ict_bot (forward=-Y) without changes.
+    """
+    # Reuse the existing function so any future v2 tweak is inherited automatically.
+    base = navigation_reward_stage4_v2(env)
+
+    robot = env.scene["robot"]
+    speed = torch.norm(robot.data.root_lin_vel_b[:, :2], dim=-1)
+    yaw_rate = robot.data.root_ang_vel_b[:, 2]
+
+    # Lateral escape room — reuse the same lidar helper.
+    _, front_min, right_min, left_min = _get_lidar_distances(env)
+    goal_dist, _ = _get_goal_distance_and_angle(env)
+    has_escape_room = (left_min > 0.40) | (right_min > 0.40)
+    corner_trapped = (front_min < 0.40) & ~has_escape_room
+
+    orbiting = (
+        (speed < _ORBIT_SPEED_THRESH)
+        & (torch.abs(yaw_rate) > _ORBIT_YAWRATE_THRESH)
+        & (goal_dist > _ORBIT_GOAL_GUARD)
+        & ~corner_trapped
+    )
+    r_orbit = torch.where(
+        orbiting,
+        torch.full_like(base, _ORBIT_PENALTY),
+        torch.zeros_like(base),
+    )
+    return base + r_orbit
+
+
+@configclass
+class Stage4RewardsCfgV2Orbit:
+    """Stage 4/5 reward + orbit-penalty term. Use for finetuning a checkpoint
+    whose dodge behavior degenerates into orbiting around obstacles."""
+    navigation = RewTerm(func=navigation_reward_stage4_v2_orbit, weight=1.0)
+
+
+# ──────────── Orbit penalty + gap-through bonus (smooth variant) ──────────────
+# Stacks on top of v2_orbit: in addition to penalizing spin-in-place, this
+# variant *positively* rewards driving forward when there's an obstacle to
+# react to AND lateral clearance to weave through. Together the two terms
+# form a "stick + carrot" pair — orbit is punished, side-weaving is paid for.
+
+_GAP_FRONT_THRESH      = 1.0     # m — only pay the bonus when an obstacle/wall is within this range ahead
+_GAP_SIDE_CLEARANCE    = 0.50    # m — at least one side must be open by this much
+_GAP_FORWARD_ACTION    = 0.50    # normalized linear action ≥ this counts as "committed forward"
+_GAP_THROUGH_BONUS     = 0.30    # per step when the gap-through condition fires
+
+
+def navigation_reward_stage4_v2_smooth(env: ManagerBasedRLEnv) -> torch.Tensor:
+    """Stage 4/5 reward + orbit penalty + gap-through bonus.
+
+    Builds on v2_orbit by adding r_gap_through: when there's something within
+    _GAP_FRONT_THRESH ahead (so the dodge choice actually matters) AND at least
+    one side has _GAP_SIDE_CLEARANCE of open space AND the policy is committing
+    to forward motion (action_linear ≥ _GAP_FORWARD_ACTION), pay a flat bonus.
+
+    The bonus targets the side-weave behavior directly: "obstacle ahead, gap on
+    the side, drive through it". It only fires in situations where the dodge
+    choice is real — empty arena driving doesn't trigger it.
+    """
+    base = navigation_reward_stage4_v2_orbit(env)
+
+    _, front_min, right_min, left_min = _get_lidar_distances(env)
+    _, action_angular = _get_real_actions(env)
+    action_linear, _ = _get_real_actions(env)
+
+    threat_ahead = front_min < _GAP_FRONT_THRESH
+    side_open    = (left_min > _GAP_SIDE_CLEARANCE) | (right_min > _GAP_SIDE_CLEARANCE)
+    committed    = action_linear >= _GAP_FORWARD_ACTION
+
+    gap_through = threat_ahead & side_open & committed
+    r_gap = torch.where(
+        gap_through,
+        torch.full_like(base, _GAP_THROUGH_BONUS),
+        torch.zeros_like(base),
+    )
+    return base + r_gap
+
+
+@configclass
+class Stage4RewardsCfgV2Smooth:
+    """Stage 4/5 reward + orbit penalty + gap-through bonus. The "best
+    behavior" deployment variant — discourages orbit-dodge and pays for
+    side-weave so the policy translates past obstacles instead of orbiting
+    or stalling."""
+    navigation = RewTerm(func=navigation_reward_stage4_v2_smooth, weight=1.0)
 
 
 def navigation_reward_stage4_v3(env: ManagerBasedRLEnv) -> torch.Tensor:
@@ -1403,4 +1514,5 @@ def navigation_reward_stage4_v3(env: ManagerBasedRLEnv) -> torch.Tensor:
 @configclass
 class Stage4RewardsCfgV3:
     navigation = RewTerm(func=navigation_reward_stage4_v3, weight=1.0)
+
 

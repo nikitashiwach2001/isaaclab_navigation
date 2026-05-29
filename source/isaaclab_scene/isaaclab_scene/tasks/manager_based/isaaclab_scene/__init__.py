@@ -134,6 +134,53 @@ gym.register(
     },
 )
 
+# Stage 5 mixed-spawn + orbit-penalty reward — same scene/events, only the
+# reward is shaped to discourage spin-in-place dodging. Finetune target for
+# fixing a policy whose dodge collapses into orbiting nearby obstacles.
+gym.register(
+    id="IsaaclabScene-Stage5-MixedSpawn-Orbit-v0",
+    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    disable_env_checker=True,
+    kwargs={
+        "env_cfg_entry_point": f"{__name__}.stage5_env_cfg:Stage5MixedSpawnOrbitEnvCfg",
+    },
+)
+
+# Stage 5 mixed-spawn + orbit penalty + gap-through bonus — stacks both
+# shaping terms. Finetune target for producing the "best behavior" deployed
+# policy: no orbiting, prefers side-weaving past obstacles.
+gym.register(
+    id="IsaaclabScene-Stage5-MixedSpawn-Smooth-v0",
+    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    disable_env_checker=True,
+    kwargs={
+        "env_cfg_entry_point": f"{__name__}.stage5_env_cfg:Stage5MixedSpawnSmoothEnvCfg",
+    },
+)
+
+# Stage 6 — Stage 5 arena + five obstacles (four moving + one static blocker).
+# Planner stress-test; a Stage 5 policy runs on it unchanged (same obs/reward).
+gym.register(
+    id="IsaaclabScene-Stage6-v0",
+    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    disable_env_checker=True,
+    kwargs={
+        "env_cfg_entry_point": f"{__name__}.stage6_env_cfg:Stage6EnvCfg",
+    },
+)
+
+# Stage 6a — open arena (no outer walls): robot starts inside a left-side
+# corridor and must exit east to reach a goal in the Stage 6 obstacle
+# field. Planner eval scene only; uses the same Stage 6 obstacle motions.
+gym.register(
+    id="IsaaclabScene-Stage6a-v0",
+    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    disable_env_checker=True,
+    kwargs={
+        "env_cfg_entry_point": f"{__name__}.stage6_env_cfg:Stage6aEnvCfg",
+    },
+)
+
 # Stage 5 PPO — same scene, but env rewards include terminal bonus/penalty for RSL-RL
 # gym.register(
 #     id="IsaaclabScene-Stage5-PPO-v0",
