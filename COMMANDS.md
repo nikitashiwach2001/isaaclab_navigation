@@ -336,4 +336,6 @@ python scripts/play_td3.py \
   --use_conv --hidden_dim 512 --eval_episodes 200 --headless
 
 
+## test policy with planner
 
+ROBOT=ictbot LIDAR_STACK_FRAMES=6 OBSTACLE_SPEED_SCALE=1.5 STAGE6_OBSTACLE_PHASE_RESET=0 python scripts/play_td3_planner.py   --task IsaaclabScene-Stage6a-v0 --num_envs 32 --checkpoint logs/ict_bot/stage5_ictbot_orbit_finetune/20260528_081745/td3_final.pt   --use_conv --hidden_dim 512 --eval_episodes 100   --inflate 0.30 --block_radius 0.40 --cluster_dist 0.30   --replan_every 2 --replan_lookahead_m 2.5 --proximity_replan_m 1.2   --switch_radius 0.25 --waypoint_spacing 0.10   --episode_length_s 90.0 --no_progress_timeout_s 25.0 --headless
