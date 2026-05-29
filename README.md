@@ -162,10 +162,20 @@ python scripts/train_td3.py \
 ```
 
 `OBSTACLE_SPEED_SCALE` semantics: keyframe times are *multiplied* by the
-scale, so **higher = slower obstacles** (easier).
-- `1.0` = fastest (training default)
-- `1.5` = ~33% slower (deployment-time stress test)
-- `2.0` = half speed (intermediate-curriculum step)
+scale, so **higher = slower obstacles** (easier). Recommended curriculum
+order — train at the easiest scale until SR plateaus, then step down:
+
+- `4.0` = quarter speed (easiest — curriculum start)
+- `3.0` = one-third speed
+- `2.0` = half speed (intermediate)
+- `1.5` = ~33% slower than baseline (stress test / final curriculum step)
+- `1.0` = fastest (training default, hardest)
+
+Concretely: start at `OBSTACLE_SPEED_SCALE=4.0` for ~1M steps to learn the
+basic dodge behavior, save the best ckpt, then finetune at `3.0` for
+another ~1M, then `2.0`, etc. Each step reuses the previous ckpt via
+`--load_checkpoint` and a smaller actor LR to keep the policy stable as
+obstacles get faster.
 
 ### 3.5 ict_bot adaptation — finetune a TurtleBot policy
 
@@ -380,7 +390,7 @@ These can all be combined freely on a single command line.
 
 | Variable | Default | Effect |
 |---|---|---|
-| `OBSTACLE_SPEED_SCALE`     | `2.0` (stage 6), see file for others | Keyframe-time multiplier; higher = slower obstacles |
+| `OBSTACLE_SPEED_SCALE`     | `2.0` (stage 6), see file for others | Keyframe-time multiplier; higher = slower obstacles. Curriculum: `4.0 → 3.0 → 2.0 → 1.5 → 1.0` |
 | `STAGE4_OBSTACLE_PHASE_RESET` | `1` | Set to `0` at eval time so SR is reproducible |
 | `STAGE5_OBSTACLE_PHASE_RESET` | `1` | Same as above for Stage 5 |
 | `STAGE6_OBSTACLE_PHASE_RESET` | `1` | Same as above for Stage 6 / 6a |
@@ -414,19 +424,3 @@ These can all be combined freely on a single command line.
   Edit `.vscode/settings.json` and exclude unused `extscache/omni.*` paths.
 
 ---
-
-## 8. Optional: Omniverse extension setup
-
-This project can also load as an Omniverse extension. Add `source/` to the
-Extension Search Paths in `Window → Extensions → ☰ → Settings`, refresh, then
-find the extension under `Third Party` and toggle it on. The example UI lives
-in [`ui_extension_example.py`](source/isaaclab_scene/isaaclab_scene/ui_extension_example.py).
-
----
-
-## 9. Code formatting
-
-```bash
-pip install pre-commit
-pre-commit run --all-files
-```
